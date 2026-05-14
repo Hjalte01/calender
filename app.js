@@ -159,7 +159,7 @@ function init() {
   });
   document.addEventListener("click", (event) => {
     if (!state.pendingPhoto) return;
-    if (event.target.closest(".image-drawer, .photo-panel, .year-photo")) return;
+    if (event.target.closest(".image-drawer, .photo-panel")) return;
     cancelPhotoAssignment();
   });
 
@@ -485,20 +485,11 @@ function replaceYear(date, year) {
 }
 
 function render() {
-  const photoHeightRatio = Number(photoHeightInput.value) / 100;
   document.documentElement.style.setProperty("--accent", accentInput.value);
   document.documentElement.style.setProperty("--photo-height", `${photoHeightInput.value}%`);
   document.documentElement.style.setProperty(
-    "--year-photo-aspect-ratio",
-    String(210 / (297 * photoHeightRatio)),
-  );
-  document.documentElement.style.setProperty(
     "--photo-accent-width",
     showPhotoAccentInput.checked ? "7px" : "0px",
-  );
-  document.documentElement.style.setProperty(
-    "--year-photo-accent-width",
-    showPhotoAccentInput.checked ? "3px" : "0px",
   );
 
   const selectedMonth = getSelectedMonth();
@@ -919,7 +910,18 @@ function renderCalendarGrid(monthDate, targetGrid) {
 }
 
 function renderYearOverview(year) {
-  const key = `${year}|${monthInput.value}|${photoVersion}|${Boolean(state.pendingPhoto)}`;
+  const key = [
+    year,
+    monthInput.value,
+    titleInput.value,
+    photoVersion,
+    Boolean(state.pendingPhoto),
+    showWeekNumbersInput.checked,
+    hideOutsideDaysInput.checked,
+    showMemberColorsInput.checked,
+    getEventsSignature(),
+    getMembersSignature(),
+  ].join("|");
   if (renderCache.year === key) return;
   renderCache.year = key;
 
@@ -932,26 +934,31 @@ function renderYearOverview(year) {
 }
 
 function renderYearMonth(monthDate) {
-  const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(
-    2,
-    "0",
-  )}`;
-  const button = document.createElement("button");
-  button.type = "button";
+  const monthKey = toMonthKey(monthDate);
+  const button = document.createElement("div");
   button.className = "year-month";
+  button.setAttribute("role", "button");
+  button.setAttribute("tabindex", "0");
+  button.setAttribute("aria-label", `Select ${monthFormatter.format(monthDate)}`);
   button.classList.toggle("is-selected", monthKey === monthInput.value);
   button.addEventListener("click", () => {
     monthInput.value = monthKey;
     renderAndSave();
   });
+  button.addEventListener("keydown", (event) => {
+    if (event.target !== button || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    monthInput.value = monthKey;
+    renderAndSave();
+  });
 
-  const photo = document.createElement("div");
-  photo.className = "year-photo";
-  photo.classList.toggle("is-assign-target", Boolean(state.pendingPhoto));
-  photo.setAttribute("role", "button");
-  photo.setAttribute("tabindex", "0");
-  photo.setAttribute("aria-label", `Choose photo for ${monthFormatter.format(monthDate)}`);
-  photo.addEventListener("click", (event) => {
+  const page = renderYearPreviewPage(monthDate);
+  const photoPanel = page.querySelector(".year-preview-photo");
+  photoPanel.classList.toggle("is-assign-target", Boolean(state.pendingPhoto));
+  photoPanel.setAttribute("role", "button");
+  photoPanel.setAttribute("tabindex", "0");
+  photoPanel.setAttribute("aria-label", `Choose photo for ${monthFormatter.format(monthDate)}`);
+  photoPanel.addEventListener("click", (event) => {
     event.stopPropagation();
     monthInput.value = monthKey;
     if (!assignPendingPhoto(monthKey)) {
@@ -959,7 +966,7 @@ function renderYearMonth(monthDate) {
       render();
     }
   });
-  photo.addEventListener("keydown", (event) => {
+  photoPanel.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       event.stopPropagation();
@@ -970,47 +977,52 @@ function renderYearMonth(monthDate) {
       }
     }
   });
-  if (state.photos[monthKey]) {
-    const image = document.createElement("img");
-    image.src = state.photos[monthKey];
-    image.alt = "";
-    photo.append(image);
-  } else {
-    photo.textContent = "No photo";
-  }
 
-  const title = document.createElement("div");
-  title.className = "year-month-title";
-  title.textContent = monthFormatter.format(monthDate);
-  photo.append(title);
-
-  const body = document.createElement("div");
-  body.className = "year-month-body";
-  body.append(renderMiniCalendar(monthDate));
-
-  button.append(photo, body);
+  button.append(page);
   return button;
 }
 
-function renderMiniCalendar(monthDate) {
+function renderYearPreviewPage(monthDate) {
+  const page = document.createElement("div");
+  page.className = "year-preview-page";
+
+  const monthKey = toMonthKey(monthDate);
+  const photo = state.photos[monthKey] || "";
+  const header = document.createElement("header");
+  header.className = "photo-panel year-preview-photo";
+  header.classList.toggle("has-photo", Boolean(photo));
+
+  if (photo) {
+    const image = document.createElement("img");
+    image.src = photo;
+    image.alt = "";
+    header.append(image);
+  } else {
+    const placeholder = document.createElement("div");
+    placeholder.className = "photo-placeholder";
+    placeholder.textContent = "Choose a photo";
+    header.append(placeholder);
+  }
+
+  const title = document.createElement("div");
+  title.className = "calendar-title";
+  const titleText = document.createElement("span");
+  titleText.textContent = titleInput.value;
+  const monthText = document.createElement("strong");
+  monthText.textContent = monthFormatter.format(monthDate);
+  title.append(titleText, monthText);
+  header.append(title);
+
+  const wrap = document.createElement("div");
+  wrap.className = "calendar-wrap";
   const grid = document.createElement("div");
-  grid.className = "mini-calendar";
+  grid.className = "calendar-grid";
+  grid.classList.toggle("no-weeks", !showWeekNumbersInput.checked);
+  renderCalendarGrid(monthDate, grid);
+  wrap.append(grid);
 
-  weekdays.forEach((weekday) => {
-    grid.append(createCell("mini-weekday", weekday.slice(0, 1)));
-  });
-
-  buildCalendarDays(monthDate).forEach((week) => {
-    week.forEach((date) => {
-      const day = createCell("mini-day", date.getDate());
-      if (date.getMonth() !== monthDate.getMonth()) {
-        day.classList.add("outside");
-      }
-      grid.append(day);
-    });
-  });
-
-  return grid;
+  page.append(header, wrap);
+  return page;
 }
 
 function renderDay(date, monthDate) {
