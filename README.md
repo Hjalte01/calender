@@ -25,7 +25,8 @@ http://localhost:8000
 - Switch to year overview to see all 12 months at once and select the month you want to edit.
 - Upload a separate photo for each month.
 - Print a selected month range as one A4 page per month.
-- Manage month photos from an image drawer where photos can be bulk-added, assigned, swapped, or removed.
+- Manage photos from an image drawer with month images and extra images. Bulk-added photos fill empty months in the print range first; overflow goes to Extra.
+- Use `Use photo` in the drawer, then click a month photo area or year tile plus target to place it.
 - Use top control tabs for Main, Style, Family, and Events instead of one long sidebar.
 - Change title, accent color, photo height, and week numbers.
 - Optionally hide dates from previous and next months.

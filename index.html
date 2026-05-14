@@ -34,10 +34,7 @@
             Title
             <input id="titleInput" type="text" value="" />
           </label>
-          <label>
-            Photo for this month
-            <input id="photoInput" type="file" accept="image/*" />
-          </label>
+          <input id="photoInput" class="hidden-input" type="file" accept="image/*" />
           <div class="print-range">
             <label>
               Print from
@@ -172,11 +169,15 @@
           <button id="closeImageDrawerButton" class="icon-button" type="button" aria-label="Close images">×</button>
         </div>
         <p class="hint">Assign, swap, or remove photos for the selected month.</p>
+        <div class="drawer-tabs" aria-label="Image categories">
+          <button id="monthImagesTabButton" type="button" aria-pressed="true">Images</button>
+          <button id="extraImagesTabButton" type="button" aria-pressed="false">Extra</button>
+        </div>
         <label>
           Add images
           <input id="bulkPhotoInput" type="file" accept="image/*" multiple />
         </label>
-        <button id="autoAssignImagesButton" type="button">Auto-assign from selected month</button>
+        <p class="hint">New images fill empty months from print range first. Overflow goes to Extra.</p>
         <div id="imageList" class="image-list"></div>
       </aside>
     </main>

@@ -2,8 +2,11 @@ const state = {
   events: [],
   members: [],
   photos: {},
+  extraPhotos: [],
   viewMode: "month",
   photoTargetMonth: "",
+  pendingPhoto: "",
+  imageDrawerTab: "images",
   activePanel: "main",
   imageDrawerOpen: false,
 };
@@ -68,7 +71,8 @@ const imageDrawerButton = document.querySelector("#imageDrawerButton");
 const imageDrawer = document.querySelector("#imageDrawer");
 const closeImageDrawerButton = document.querySelector("#closeImageDrawerButton");
 const bulkPhotoInput = document.querySelector("#bulkPhotoInput");
-const autoAssignImagesButton = document.querySelector("#autoAssignImagesButton");
+const monthImagesTabButton = document.querySelector("#monthImagesTabButton");
+const extraImagesTabButton = document.querySelector("#extraImagesTabButton");
 const imageList = document.querySelector("#imageList");
 const photoPreview = document.querySelector("#photoPreview");
 const photoPanel = document.querySelector(".photo-panel");
@@ -113,11 +117,17 @@ function init() {
   showMemberColorsInput.addEventListener("change", renderAndSave);
   importRegexInput.addEventListener("input", renderAndSave);
   photoInput.addEventListener("change", handlePhoto);
-  photoPanel.addEventListener("click", () => openPhotoPicker(monthInput.value));
+  photoPanel.addEventListener("click", () => {
+    if (!assignPendingPhoto(monthInput.value)) {
+      openPhotoPicker(monthInput.value);
+    }
+  });
   photoPanel.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      openPhotoPicker(monthInput.value);
+      if (!assignPendingPhoto(monthInput.value)) {
+        openPhotoPicker(monthInput.value);
+      }
     }
   });
   addMemberButton.addEventListener("click", addMember);
@@ -127,7 +137,8 @@ function init() {
   imageDrawerButton.addEventListener("click", () => toggleImageDrawer());
   closeImageDrawerButton.addEventListener("click", () => toggleImageDrawer(false));
   bulkPhotoInput.addEventListener("change", handleBulkPhotos);
-  autoAssignImagesButton.addEventListener("click", autoAssignImages);
+  monthImagesTabButton.addEventListener("click", () => setImageDrawerTab("images"));
+  extraImagesTabButton.addEventListener("click", () => setImageDrawerTab("extra"));
   printButton.addEventListener("click", printCalendar);
   window.addEventListener("beforeprint", renderPrintStack);
   clearButton.addEventListener("click", () => {
@@ -138,6 +149,16 @@ function init() {
     if (saveTimer) {
       saveState();
     }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && state.pendingPhoto) {
+      cancelPhotoAssignment();
+    }
+  });
+  document.addEventListener("click", (event) => {
+    if (!state.pendingPhoto) return;
+    if (event.target.closest(".image-drawer, .photo-panel, .year-photo")) return;
+    cancelPhotoAssignment();
   });
 
   render();
@@ -176,12 +197,17 @@ async function handleBulkPhotos(event) {
   const files = [...(event.target.files ?? [])];
   if (!files.length) return;
 
-  const startDate = getSelectedMonth();
   const images = await Promise.all(files.map(readFileAsDataUrl));
+  const openMonths = buildPrintMonths()
+    .map(toMonthKey)
+    .filter((monthKey) => !state.photos[monthKey]);
+
   images.forEach((image, index) => {
-    const month = new Date(startDate);
-    month.setMonth(startDate.getMonth() + index);
-    setPhoto(toMonthKey(month), image);
+    if (index < openMonths.length) {
+      setPhoto(openMonths[index], image);
+    } else {
+      addExtraPhoto(image);
+    }
   });
 
   bulkPhotoInput.value = "";
@@ -214,19 +240,6 @@ function readFileAsDataUrl(file) {
 
     image.src = objectUrl;
   });
-}
-
-function autoAssignImages() {
-  const photos = Object.entries(state.photos)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([, photo]) => photo);
-  const startDate = getSelectedMonth();
-  photos.forEach((photo, index) => {
-    const month = new Date(startDate);
-    month.setMonth(startDate.getMonth() + index);
-    setPhoto(toMonthKey(month), photo);
-  });
-  renderAndSave();
 }
 
 function openPhotoPicker(monthKey) {
@@ -592,6 +605,11 @@ function setActivePanel(panel) {
   renderAndSave();
 }
 
+function setImageDrawerTab(tab) {
+  state.imageDrawerTab = tab;
+  renderAndSave();
+}
+
 function toggleImageDrawer(forceOpen = !state.imageDrawerOpen) {
   state.imageDrawerOpen = forceOpen;
   renderAndSave();
@@ -612,10 +630,43 @@ function setPhoto(monthKey, photo) {
   photoVersion += 1;
 }
 
+function addExtraPhoto(photo) {
+  state.extraPhotos.push({
+    id: crypto.randomUUID(),
+    photo,
+  });
+  photoVersion += 1;
+}
+
+function removeExtraPhoto(id) {
+  const nextPhotos = state.extraPhotos.filter((item) => item.id !== id);
+  if (nextPhotos.length === state.extraPhotos.length) return;
+  state.extraPhotos = nextPhotos;
+  photoVersion += 1;
+}
+
 function removePhoto(monthKey) {
   if (!(monthKey in state.photos)) return;
   delete state.photos[monthKey];
   photoVersion += 1;
+}
+
+function startPhotoAssignment(photo) {
+  state.pendingPhoto = photo;
+  renderAndSave();
+}
+
+function cancelPhotoAssignment() {
+  state.pendingPhoto = "";
+  renderAndSave();
+}
+
+function assignPendingPhoto(monthKey) {
+  if (!state.pendingPhoto) return false;
+  setPhoto(monthKey, state.pendingPhoto);
+  state.pendingPhoto = "";
+  renderAndSave();
+  return true;
 }
 
 function toMonthKey(date) {
@@ -662,7 +713,9 @@ function renderControls() {
 function renderMonthPhoto(selectedMonth) {
   const monthLabel = monthFormatter.format(selectedMonth);
   const photo = getCurrentPhoto();
-  const key = `${monthInput.value}|${titleInput.value}|${monthLabel}|${photoVersion}`;
+  const key = `${monthInput.value}|${titleInput.value}|${monthLabel}|${photoVersion}|${Boolean(
+    state.pendingPhoto,
+  )}`;
   if (renderCache.monthPhoto === key) return;
   renderCache.monthPhoto = key;
 
@@ -676,34 +729,45 @@ function renderMonthPhoto(selectedMonth) {
     photoPreview.dataset.currentSrc = photo;
   }
   photoPanel.classList.toggle("has-photo", Boolean(photo));
+  photoPanel.classList.toggle("is-assign-target", Boolean(state.pendingPhoto));
   monthPreview.textContent = monthLabel;
 }
 
 function renderImageDrawer() {
-  const key = `${state.imageDrawerOpen}|${monthInput.value}|${photoVersion}`;
+  const key = `${state.imageDrawerOpen}|${state.imageDrawerTab}|${monthInput.value}|${photoVersion}`;
   if (renderCache.drawer === key) return;
   renderCache.drawer = key;
 
   app.classList.toggle("has-image-drawer", state.imageDrawerOpen);
   imageDrawer.classList.toggle("is-hidden", !state.imageDrawerOpen);
   imageDrawerButton.setAttribute("aria-pressed", String(state.imageDrawerOpen));
+  monthImagesTabButton.setAttribute("aria-pressed", String(state.imageDrawerTab === "images"));
+  extraImagesTabButton.setAttribute("aria-pressed", String(state.imageDrawerTab === "extra"));
   imageList.innerHTML = "";
 
-  const entries = Object.entries(state.photos).sort(([a], [b]) => a.localeCompare(b));
+  const entries =
+    state.imageDrawerTab === "images"
+      ? Object.entries(state.photos)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([monthKey, photo]) => ({ id: monthKey, monthKey, photo, type: "month" }))
+      : state.extraPhotos.map((item) => ({ ...item, type: "extra" }));
+
   if (!entries.length) {
     const empty = document.createElement("p");
     empty.className = "hint";
-    empty.textContent = "No photos added yet.";
+    empty.textContent =
+      state.imageDrawerTab === "images" ? "No month photos added yet." : "No extra photos.";
     imageList.append(empty);
     return;
   }
 
-  entries.forEach(([monthKey, photo]) => {
-    imageList.append(renderImageItem(monthKey, photo));
+  entries.forEach((entry) => {
+    imageList.append(renderImageItem(entry));
   });
 }
 
-function renderImageItem(monthKey, photo) {
+function renderImageItem(entry) {
+  const { id, monthKey, photo, type } = entry;
   const item = document.createElement("article");
   item.className = "image-item";
 
@@ -711,8 +775,10 @@ function renderImageItem(monthKey, photo) {
   thumb.type = "button";
   thumb.className = "image-thumb";
   thumb.addEventListener("click", () => {
-    monthInput.value = monthKey;
-    renderAndSave();
+    if (monthKey) {
+      monthInput.value = monthKey;
+      renderAndSave();
+    }
   });
 
   const image = document.createElement("img");
@@ -722,15 +788,25 @@ function renderImageItem(monthKey, photo) {
 
   const meta = document.createElement("div");
   meta.className = "image-meta";
-  meta.textContent = monthFormatter.format(monthKeyToDate(monthKey));
+  meta.textContent = monthKey ? monthFormatter.format(monthKeyToDate(monthKey)) : "Extra image";
 
   const monthSelect = document.createElement("select");
-  monthSelect.value = monthKey;
+  const unassignedOption = document.createElement("option");
+  unassignedOption.value = "";
+  unassignedOption.textContent = "Extra";
+  monthSelect.append(unassignedOption);
   buildMonthOptions().forEach((option) => monthSelect.append(option));
+  monthSelect.value = monthKey || "";
   monthSelect.addEventListener("change", () => {
-    setPhoto(monthSelect.value, photo);
-    if (monthSelect.value !== monthKey) {
+    if (monthSelect.value) {
+      setPhoto(monthSelect.value, photo);
+    } else {
+      addExtraPhoto(photo);
+    }
+    if (type === "month" && monthSelect.value !== monthKey) {
       removePhoto(monthKey);
+    } else if (type === "extra") {
+      removeExtraPhoto(id);
     }
     renderAndSave();
   });
@@ -740,10 +816,9 @@ function renderImageItem(monthKey, photo) {
 
   const assignButton = document.createElement("button");
   assignButton.type = "button";
-  assignButton.textContent = "Assign";
+  assignButton.textContent = "Use photo";
   assignButton.addEventListener("click", () => {
-    setPhoto(monthInput.value, photo);
-    renderAndSave();
+    startPhotoAssignment(photo);
   });
 
   const swapButton = document.createElement("button");
@@ -753,10 +828,13 @@ function renderImageItem(monthKey, photo) {
     const selectedMonth = monthInput.value;
     const currentPhoto = state.photos[selectedMonth];
     setPhoto(selectedMonth, photo);
-    if (currentPhoto) {
+    if (type === "month" && currentPhoto) {
       setPhoto(monthKey, currentPhoto);
-    } else {
+    } else if (type === "month") {
       removePhoto(monthKey);
+    } else if (type === "extra") {
+      removeExtraPhoto(id);
+      if (currentPhoto) addExtraPhoto(currentPhoto);
     }
     renderAndSave();
   });
@@ -765,7 +843,11 @@ function renderImageItem(monthKey, photo) {
   removeButton.type = "button";
   removeButton.textContent = "Remove";
   removeButton.addEventListener("click", () => {
-    removePhoto(monthKey);
+    if (type === "month") {
+      removePhoto(monthKey);
+    } else {
+      removeExtraPhoto(id);
+    }
     renderAndSave();
   });
 
@@ -809,7 +891,7 @@ function renderCalendarGrid(monthDate, targetGrid) {
 }
 
 function renderYearOverview(year) {
-  const key = `${year}|${monthInput.value}|${photoVersion}`;
+  const key = `${year}|${monthInput.value}|${photoVersion}|${Boolean(state.pendingPhoto)}`;
   if (renderCache.year === key) return;
   renderCache.year = key;
 
@@ -837,22 +919,27 @@ function renderYearMonth(monthDate) {
 
   const photo = document.createElement("div");
   photo.className = "year-photo";
+  photo.classList.toggle("is-assign-target", Boolean(state.pendingPhoto));
   photo.setAttribute("role", "button");
   photo.setAttribute("tabindex", "0");
   photo.setAttribute("aria-label", `Choose photo for ${monthFormatter.format(monthDate)}`);
   photo.addEventListener("click", (event) => {
     event.stopPropagation();
     monthInput.value = monthKey;
-    openPhotoPicker(monthKey);
-    render();
+    if (!assignPendingPhoto(monthKey)) {
+      openPhotoPicker(monthKey);
+      render();
+    }
   });
   photo.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       event.stopPropagation();
       monthInput.value = monthKey;
-      openPhotoPicker(monthKey);
-      render();
+      if (!assignPendingPhoto(monthKey)) {
+        openPhotoPicker(monthKey);
+        render();
+      }
     }
   });
   if (state.photos[monthKey]) {
@@ -1121,6 +1208,7 @@ function saveState() {
     events: state.events,
     members: state.members,
     photos: state.photos,
+    extraPhotos: state.extraPhotos,
     settings: {
       month: monthInput.value,
       printStart: printStartInput.value,
@@ -1134,6 +1222,7 @@ function saveState() {
       importRegex: importRegexInput.value,
       viewMode: state.viewMode,
       activePanel: state.activePanel,
+      imageDrawerTab: state.imageDrawerTab,
       imageDrawerOpen: state.imageDrawerOpen,
     },
   };
@@ -1164,6 +1253,7 @@ function loadSavedState() {
     state.events = Array.isArray(saved.events) ? saved.events : [];
     state.members = Array.isArray(saved.members) ? saved.members : [];
     state.photos = saved.photos && typeof saved.photos === "object" ? saved.photos : {};
+    state.extraPhotos = Array.isArray(saved.extraPhotos) ? saved.extraPhotos : [];
 
     if (saved.settings) {
       monthInput.value = saved.settings.month || monthInput.value;
@@ -1180,6 +1270,7 @@ function loadSavedState() {
       importRegexInput.value = saved.settings.importRegex || importRegexInput.value;
       state.viewMode = saved.settings.viewMode || state.viewMode;
       state.activePanel = saved.settings.activePanel || state.activePanel;
+      state.imageDrawerTab = saved.settings.imageDrawerTab || state.imageDrawerTab;
       state.imageDrawerOpen = saved.settings.imageDrawerOpen ?? state.imageDrawerOpen;
     }
   } catch (error) {

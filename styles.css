@@ -166,6 +166,10 @@ input[type="range"] {
   padding: 0;
 }
 
+.hidden-input {
+  display: none;
+}
+
 .checkbox-row {
   display: flex;
   align-items: center;
@@ -308,6 +312,22 @@ button + button {
   color: var(--ink);
   background: #e4ded3;
   font-size: 1.2rem;
+}
+
+.drawer-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.drawer-tabs button {
+  color: var(--ink);
+  background: #e4ded3;
+}
+
+.drawer-tabs button[aria-pressed="true"] {
+  color: #fff;
+  background: var(--accent);
 }
 
 .image-list {
@@ -507,6 +527,20 @@ button + button {
   background: #ded6c9;
   color: #69707a;
   font-size: 0.72rem;
+}
+
+.photo-panel.is-assign-target::after,
+.year-photo.is-assign-target::after {
+  content: "+";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgb(0 0 0 / 38%);
+  font-size: clamp(2rem, 8vw, 5rem);
+  font-weight: 800;
+  text-shadow: 0 2px 8px rgb(0 0 0 / 60%);
 }
 
 .year-photo img {
