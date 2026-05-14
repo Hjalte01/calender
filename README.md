@@ -11,12 +11,15 @@ Open `index.html` in a browser. No build step is required.
 - One month per A4 page.
 - Upload a photo for the top of the page.
 - Change title, accent color, photo height, and week numbers.
+- Optionally hide dates from previous and next months.
+- Add family members and color-code their events.
 - Add events manually with this format:
 
 ```text
-2026-05-17 Grandma /flag_dk
+2001-05-13 Grandma /flag_dk
 ```
 
+- Flagged old dates are treated as birthday-style annual events. For example, when printing May 2026, `2001-05-13 Grandma /flag_dk` renders as `Grandma (25)` with the flag.
 - Supported flag tokens: `/flag_dk`, `/flag_no`, `/flag_se`.
 - Import basic `.ics` files. Imported events currently get `/flag_dk` by default because this scaffold is birthday-oriented.
 - Print using the browser print dialog.

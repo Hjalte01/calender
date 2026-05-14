@@ -78,6 +78,7 @@ label {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   border: 1px solid #c8c1b5;
@@ -104,6 +105,13 @@ input[type="range"] {
 
 .checkbox-row input {
   width: auto;
+}
+
+.family-row {
+  display: grid;
+  grid-template-columns: 1fr 76px;
+  gap: 10px;
+  align-items: end;
 }
 
 .hint {
@@ -133,7 +141,8 @@ button + button {
   background: #e4ded3;
 }
 
-.event-list {
+.event-list,
+.member-list {
   display: grid;
   gap: 8px;
   margin: 0;
@@ -141,7 +150,8 @@ button + button {
   list-style: none;
 }
 
-.event-list li {
+.event-list li,
+.member-list li {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
@@ -153,7 +163,24 @@ button + button {
   font-size: 0.84rem;
 }
 
-.event-list button {
+.member-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.member-swatch {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgb(0 0 0 / 20%);
+  border-radius: 999px;
+  background: var(--member-color);
+}
+
+.event-list button,
+.member-list button {
   min-height: 30px;
   padding: 4px 8px;
   color: var(--ink);
@@ -272,6 +299,15 @@ button + button {
   background: #f7f2e9;
 }
 
+.day.outside.is-hidden {
+  color: transparent;
+}
+
+.day.outside.is-hidden .day-number,
+.day.outside.is-hidden .events {
+  display: none;
+}
+
 .day-number {
   display: flex;
   justify-content: space-between;
@@ -292,8 +328,16 @@ button + button {
   gap: 4px;
   align-items: center;
   min-width: 0;
+  padding: 2px 3px;
+  border-left: 3px solid transparent;
+  border-radius: 3px;
   font-size: clamp(0.54rem, 0.75vw, 0.76rem);
   line-height: 1.15;
+}
+
+.event.has-member-color {
+  border-left-color: var(--member-color);
+  background: color-mix(in srgb, var(--member-color) 13%, transparent);
 }
 
 .event-text {

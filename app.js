@@ -1,5 +1,6 @@
 const state = {
   events: [],
+  members: [],
   photoUrl: "",
 };
 
@@ -9,6 +10,13 @@ const photoInput = document.querySelector("#photoInput");
 const accentInput = document.querySelector("#accentInput");
 const photoHeightInput = document.querySelector("#photoHeightInput");
 const showWeekNumbersInput = document.querySelector("#showWeekNumbersInput");
+const hideOutsideDaysInput = document.querySelector("#hideOutsideDaysInput");
+const showMemberColorsInput = document.querySelector("#showMemberColorsInput");
+const memberNameInput = document.querySelector("#memberNameInput");
+const memberColorInput = document.querySelector("#memberColorInput");
+const addMemberButton = document.querySelector("#addMemberButton");
+const memberList = document.querySelector("#memberList");
+const eventMemberInput = document.querySelector("#eventMemberInput");
 const eventInput = document.querySelector("#eventInput");
 const addEventButton = document.querySelector("#addEventButton");
 const icsInput = document.querySelector("#icsInput");
@@ -38,7 +46,10 @@ function init() {
   accentInput.addEventListener("input", render);
   photoHeightInput.addEventListener("input", render);
   showWeekNumbersInput.addEventListener("change", render);
+  hideOutsideDaysInput.addEventListener("change", render);
+  showMemberColorsInput.addEventListener("change", render);
   photoInput.addEventListener("change", handlePhoto);
+  addMemberButton.addEventListener("click", addMember);
   addEventButton.addEventListener("click", addTypedEvent);
   icsInput.addEventListener("change", handleIcsImport);
   printButton.addEventListener("click", () => window.print());
@@ -47,6 +58,24 @@ function init() {
     render();
   });
 
+  render();
+}
+
+function addMember() {
+  const name = memberNameInput.value.trim();
+  if (!name) {
+    memberNameInput.setCustomValidity("Enter a family member name");
+    memberNameInput.reportValidity();
+    return;
+  }
+
+  memberNameInput.setCustomValidity("");
+  state.members.push({
+    id: crypto.randomUUID(),
+    name,
+    color: memberColorInput.value,
+  });
+  memberNameInput.value = "";
   render();
 }
 
@@ -77,16 +106,19 @@ function parseManualEvent(value) {
   }
 
   eventInput.setCustomValidity("");
-  return normalizeEvent(match[1], match[2]);
+  return normalizeEvent(match[1], match[2], eventMemberInput.value);
 }
 
-function normalizeEvent(date, text) {
+function normalizeEvent(date, text, memberId = "") {
   const tokens = [...text.matchAll(/\/flag_([a-z]+)/g)].map((match) => match[1]);
+  const birthYear = tokens.length ? Number(date.slice(0, 4)) : null;
   return {
     id: crypto.randomUUID(),
     date,
     text: text.replace(/\/flag_[a-z]+/g, "").replace(/\s+/g, " ").trim(),
     flags: tokens,
+    memberId,
+    birthYear,
   };
 }
 
@@ -156,6 +188,7 @@ function render() {
 
   renderCalendar(selectedMonth);
   renderEventList();
+  renderMembers();
 }
 
 function getSelectedMonth() {
@@ -185,8 +218,12 @@ function renderCalendar(monthDate) {
 
 function renderDay(date, monthDate) {
   const cell = createCell("day", "");
-  if (date.getMonth() !== monthDate.getMonth()) {
+  const outsideMonth = date.getMonth() !== monthDate.getMonth();
+  if (outsideMonth) {
     cell.classList.add("outside");
+  }
+  if (outsideMonth && hideOutsideDaysInput.checked) {
+    cell.classList.add("is-hidden");
   }
 
   const heading = document.createElement("div");
@@ -194,20 +231,25 @@ function renderDay(date, monthDate) {
   heading.textContent = date.getDate();
   cell.append(heading);
 
-  const events = state.events.filter((item) => item.date === toDateKey(date));
+  const events = state.events.filter((item) => eventOccursOn(item, date));
   if (events.length) {
     const list = document.createElement("div");
     list.className = "events";
-    events.forEach((event) => list.append(renderCalendarEvent(event)));
+    events.forEach((event) => list.append(renderCalendarEvent(event, date.getFullYear())));
     cell.append(list);
   }
 
   return cell;
 }
 
-function renderCalendarEvent(event) {
+function renderCalendarEvent(event, displayYear) {
   const item = document.createElement("div");
   item.className = "event";
+  const member = getMember(event.memberId);
+  if (member && showMemberColorsInput.checked) {
+    item.classList.add("has-member-color");
+    item.style.setProperty("--member-color", member.color);
+  }
 
   event.flags.forEach((flag) => {
     const flagNode = document.createElement("span");
@@ -218,10 +260,27 @@ function renderCalendarEvent(event) {
 
   const text = document.createElement("span");
   text.className = "event-text";
-  text.textContent = event.text;
+  text.textContent = formatEventText(event, displayYear);
   item.append(text);
 
   return item;
+}
+
+function eventOccursOn(event, date) {
+  const [, month, day] = event.date.split("-").map(Number);
+  if (event.flags.length && event.birthYear && event.birthYear < date.getFullYear()) {
+    return date.getMonth() + 1 === month && date.getDate() === day;
+  }
+
+  return event.date === toDateKey(date);
+}
+
+function formatEventText(event, displayYear) {
+  if (!event.flags.length || !event.birthYear || event.birthYear >= displayYear) {
+    return event.text;
+  }
+
+  return `${event.text} (${displayYear - event.birthYear})`;
 }
 
 function renderEventList() {
@@ -231,7 +290,9 @@ function renderEventList() {
     .forEach((event) => {
       const item = document.createElement("li");
       const text = document.createElement("span");
-      text.textContent = `${event.date} ${event.text}`;
+      const member = getMember(event.memberId);
+      const memberLabel = member ? ` [${member.name}]` : "";
+      text.textContent = `${event.date}${memberLabel} ${event.text}`;
 
       const button = document.createElement("button");
       button.type = "button";
@@ -244,6 +305,53 @@ function renderEventList() {
       item.append(text, button);
       eventList.append(item);
     });
+}
+
+function renderMembers() {
+  const selectedMember = eventMemberInput.value;
+  eventMemberInput.innerHTML = '<option value="">Shared</option>';
+  state.members.forEach((member) => {
+    const option = document.createElement("option");
+    option.value = member.id;
+    option.textContent = member.name;
+    eventMemberInput.append(option);
+  });
+  eventMemberInput.value = state.members.some((member) => member.id === selectedMember)
+    ? selectedMember
+    : "";
+
+  memberList.innerHTML = "";
+  state.members.forEach((member) => {
+    const item = document.createElement("li");
+    const pill = document.createElement("span");
+    pill.className = "member-pill";
+
+    const swatch = document.createElement("span");
+    swatch.className = "member-swatch";
+    swatch.style.setProperty("--member-color", member.color);
+
+    const name = document.createElement("span");
+    name.textContent = member.name;
+    pill.append(swatch, name);
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "Remove";
+    button.addEventListener("click", () => {
+      state.members = state.members.filter((entry) => entry.id !== member.id);
+      state.events = state.events.map((event) =>
+        event.memberId === member.id ? { ...event, memberId: "" } : event,
+      );
+      render();
+    });
+
+    item.append(pill, button);
+    memberList.append(item);
+  });
+}
+
+function getMember(memberId) {
+  return state.members.find((member) => member.id === memberId);
 }
 
 function buildCalendarDays(monthDate) {

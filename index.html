@@ -39,14 +39,44 @@
             <input id="showWeekNumbersInput" type="checkbox" checked />
             Show week numbers
           </label>
+          <label class="checkbox-row">
+            <input id="hideOutsideDaysInput" type="checkbox" />
+            Hide other months
+          </label>
+          <label class="checkbox-row">
+            <input id="showMemberColorsInput" type="checkbox" checked />
+            Show family colors
+          </label>
+        </div>
+
+        <div class="control-group">
+          <h2>Family</h2>
+          <div class="family-row">
+            <label>
+              Name
+              <input id="memberNameInput" type="text" placeholder="Name1" />
+            </label>
+            <label>
+              Color
+              <input id="memberColorInput" type="color" value="#277da1" />
+            </label>
+          </div>
+          <button id="addMemberButton" type="button">Add family member</button>
+          <ul id="memberList" class="member-list"></ul>
         </div>
 
         <div class="control-group">
           <h2>Events</h2>
           <p class="hint">Use tokens like <code>/flag_dk</code>, <code>/flag_no</code>, or <code>/flag_se</code>.</p>
           <label>
+            For
+            <select id="eventMemberInput">
+              <option value="">Shared</option>
+            </select>
+          </label>
+          <label>
             Add event
-            <textarea id="eventInput" rows="3" placeholder="2026-05-17 Grandma /flag_dk"></textarea>
+            <textarea id="eventInput" rows="3" placeholder="2001-05-13 Name /flag_dk"></textarea>
           </label>
           <button id="addEventButton" type="button">Add event</button>
           <label>
