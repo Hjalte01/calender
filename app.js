@@ -169,18 +169,29 @@ async function handleIcsUrlImport() {
 
   importStatus.textContent = "Importing calendar link...";
   try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Calendar request failed with ${response.status}`);
-    }
-
-    const imported = addImportedEvents(parseIcs(await response.text()));
+    const imported = addImportedEvents(parseIcs(await fetchCalendarText(url)));
     importStatus.textContent = `Imported ${imported.length} events from calendar link.`;
     renderAndSave();
   } catch (error) {
     importStatus.textContent =
-      "Could not read that link from the browser. Export the calendar as an .ics file and import the file instead.";
+      "Could not read that link. Run `node server.js` and open http://localhost:8000, or import a downloaded .ics file.";
   }
+}
+
+async function fetchCalendarText(url) {
+  try {
+    return await fetchText(url);
+  } catch (error) {
+    return fetchText(`/import-ics?url=${encodeURIComponent(url)}`);
+  }
+}
+
+async function fetchText(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Calendar request failed with ${response.status}`);
+  }
+  return response.text();
 }
 
 function parseIcs(source) {
