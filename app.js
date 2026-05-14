@@ -485,8 +485,13 @@ function replaceYear(date, year) {
 }
 
 function render() {
+  const photoHeightRatio = Number(photoHeightInput.value) / 100;
   document.documentElement.style.setProperty("--accent", accentInput.value);
   document.documentElement.style.setProperty("--photo-height", `${photoHeightInput.value}%`);
+  document.documentElement.style.setProperty(
+    "--year-photo-aspect-ratio",
+    String(210 / (297 * photoHeightRatio)),
+  );
   document.documentElement.style.setProperty(
     "--photo-accent-width",
     showPhotoAccentInput.checked ? "7px" : "0px",

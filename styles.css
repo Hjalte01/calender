@@ -1,6 +1,7 @@
 :root {
   --accent: #bd1f2d;
   --photo-height: 32%;
+  --year-photo-aspect-ratio: 2.21;
   --paper: #fffdf8;
   --ink: #1f2328;
   --muted: #69707a;
@@ -491,8 +492,8 @@ button + button {
 }
 
 .year-month {
-  display: grid;
-  grid-template-rows: var(--photo-height) calc(100% - var(--photo-height));
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   aspect-ratio: 210 / 297;
   overflow: hidden;
@@ -512,7 +513,10 @@ button + button {
 .year-photo {
   position: relative;
   display: grid;
+  flex: 0 0 auto;
   place-items: center;
+  aspect-ratio: var(--year-photo-aspect-ratio);
+  width: 100%;
   overflow: hidden;
   border-bottom: var(--year-photo-accent-width) solid var(--accent);
   border-radius: 0;
@@ -555,7 +559,8 @@ button + button {
 
 .year-month-body {
   display: grid;
-  grid-template-rows: auto 1fr;
+  flex: 1 1 auto;
+  grid-template-rows: 1fr;
   gap: 4px;
   min-height: 0;
   padding: 6px;
