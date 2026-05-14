@@ -13,15 +13,11 @@ Open `index.html` in a browser. No build step is required.
 - Change title, accent color, photo height, and week numbers.
 - Optionally hide dates from previous and next months.
 - Add family members and color-code their events.
-- Add events manually with this format:
-
-```text
-2001-05-13 Grandma /flag_dk
-```
-
-- Flagged old dates are treated as birthday-style annual events. For example, when printing May 2026, `2001-05-13 Grandma /flag_dk` renders as `Grandma (25)` with the flag.
+- Add events with separate fields for year, month, day, name, family member, and flag.
+- Flagged old dates are treated as birthday-style annual events. For example, entering year `2001`, month `5`, day `13`, name `Grandma`, and `/flag_dk` renders as `Grandma (25)` when printing May 2026.
 - Supported flag tokens: `/flag_dk`, `/flag_no`, `/flag_se`.
-- Import basic `.ics` files. Imported events currently get `/flag_dk` by default because this scaffold is birthday-oriented.
+- Import basic `.ics` files or try a public calendar URL. Imported events currently get `/flag_dk` by default because this scaffold is birthday-oriented.
+- Saves events, family members, and settings in browser `localStorage`; no database is required.
 - Print using the browser print dialog.
 
 ## Existing Services I Found
@@ -45,8 +41,8 @@ The first version should stay static and cheap:
 
 The practical path is:
 
-1. Export or share the iPhone birthdays calendar as an `.ics` file or iCloud calendar feed.
-2. Import that `.ics` into this tool.
+1. Share the iPhone birthdays calendar as a public calendar link and paste it into the calendar link field, or export/download it as an `.ics` file.
+2. Import the link or `.ics` file into this tool.
 3. Map imported birthday entries to visual tokens like `/flag_dk`, cake icons, or family-specific colors.
 
-The current import is intentionally simple and should be hardened before relying on it for all recurring birthday edge cases.
+Some providers block direct browser reads of calendar links. If link import fails, downloading the `.ics` file and importing it locally is the static-site fallback.

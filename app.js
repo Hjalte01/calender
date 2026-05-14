@@ -4,6 +4,13 @@ const state = {
   photoUrl: "",
 };
 
+const STORAGE_KEY = "photo-calendar-state-v1";
+const flagOptions = [
+  { value: "dk", label: "/flag_dk" },
+  { value: "no", label: "/flag_no" },
+  { value: "se", label: "/flag_se" },
+];
+
 const monthInput = document.querySelector("#monthInput");
 const titleInput = document.querySelector("#titleInput");
 const photoInput = document.querySelector("#photoInput");
@@ -17,9 +24,16 @@ const memberColorInput = document.querySelector("#memberColorInput");
 const addMemberButton = document.querySelector("#addMemberButton");
 const memberList = document.querySelector("#memberList");
 const eventMemberInput = document.querySelector("#eventMemberInput");
-const eventInput = document.querySelector("#eventInput");
+const eventYearInput = document.querySelector("#eventYearInput");
+const eventMonthInput = document.querySelector("#eventMonthInput");
+const eventDayInput = document.querySelector("#eventDayInput");
+const eventNameInput = document.querySelector("#eventNameInput");
+const eventFlagInput = document.querySelector("#eventFlagInput");
 const addEventButton = document.querySelector("#addEventButton");
+const icsUrlInput = document.querySelector("#icsUrlInput");
+const importUrlButton = document.querySelector("#importUrlButton");
 const icsInput = document.querySelector("#icsInput");
+const importStatus = document.querySelector("#importStatus");
 const eventList = document.querySelector("#eventList");
 const printButton = document.querySelector("#printButton");
 const clearButton = document.querySelector("#clearButton");
@@ -40,22 +54,25 @@ init();
 function init() {
   const now = new Date();
   monthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  renderFlagOptions();
+  loadSavedState();
 
-  monthInput.addEventListener("change", render);
-  titleInput.addEventListener("input", render);
-  accentInput.addEventListener("input", render);
-  photoHeightInput.addEventListener("input", render);
-  showWeekNumbersInput.addEventListener("change", render);
-  hideOutsideDaysInput.addEventListener("change", render);
-  showMemberColorsInput.addEventListener("change", render);
+  monthInput.addEventListener("change", renderAndSave);
+  titleInput.addEventListener("input", renderAndSave);
+  accentInput.addEventListener("input", renderAndSave);
+  photoHeightInput.addEventListener("input", renderAndSave);
+  showWeekNumbersInput.addEventListener("change", renderAndSave);
+  hideOutsideDaysInput.addEventListener("change", renderAndSave);
+  showMemberColorsInput.addEventListener("change", renderAndSave);
   photoInput.addEventListener("change", handlePhoto);
   addMemberButton.addEventListener("click", addMember);
   addEventButton.addEventListener("click", addTypedEvent);
+  importUrlButton.addEventListener("click", handleIcsUrlImport);
   icsInput.addEventListener("change", handleIcsImport);
   printButton.addEventListener("click", () => window.print());
   clearButton.addEventListener("click", () => {
     state.events = [];
-    render();
+    renderAndSave();
   });
 
   render();
@@ -76,7 +93,7 @@ function addMember() {
     color: memberColorInput.value,
   });
   memberNameInput.value = "";
-  render();
+  renderAndSave();
 }
 
 function handlePhoto(event) {
@@ -89,36 +106,46 @@ function handlePhoto(event) {
 }
 
 function addTypedEvent() {
-  const parsed = parseManualEvent(eventInput.value);
+  const parsed = parseEventFields();
   if (!parsed) return;
   state.events.push(parsed);
-  eventInput.value = "";
-  render();
+  eventNameInput.value = "";
+  renderAndSave();
 }
 
-function parseManualEvent(value) {
-  const trimmed = value.trim();
-  const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})\s+(.+)$/);
-  if (!match) {
-    eventInput.setCustomValidity("Use: YYYY-MM-DD Text /flag_dk");
-    eventInput.reportValidity();
+function parseEventFields() {
+  const year = Number(eventYearInput.value);
+  const month = Number(eventMonthInput.value);
+  const day = Number(eventDayInput.value);
+  const name = eventNameInput.value.trim();
+  const date = buildDateKey(year, month, day);
+
+  if (!date || !name) {
+    eventNameInput.setCustomValidity("Enter a valid date and name");
+    eventNameInput.reportValidity();
     return null;
   }
 
-  eventInput.setCustomValidity("");
-  return normalizeEvent(match[1], match[2], eventMemberInput.value);
+  eventNameInput.setCustomValidity("");
+  return normalizeEvent(
+    date,
+    name,
+    eventMemberInput.value,
+    eventFlagInput.value ? [eventFlagInput.value] : [],
+  );
 }
 
-function normalizeEvent(date, text, memberId = "") {
-  const tokens = [...text.matchAll(/\/flag_([a-z]+)/g)].map((match) => match[1]);
-  const birthYear = tokens.length ? Number(date.slice(0, 4)) : null;
+function normalizeEvent(date, text, memberId = "", flags = null) {
+  const parsedFlags = flags ?? [...text.matchAll(/\/flag_([a-z]+)/g)].map((match) => match[1]);
+  const birthYear = parsedFlags.length ? Number(date.slice(0, 4)) : null;
   return {
     id: crypto.randomUUID(),
     date,
     text: text.replace(/\/flag_[a-z]+/g, "").replace(/\s+/g, " ").trim(),
-    flags: tokens,
+    flags: parsedFlags,
     memberId,
     birthYear,
+    recurring: parsedFlags.length > 0,
   };
 }
 
@@ -127,9 +154,33 @@ async function handleIcsImport(event) {
   if (!file) return;
 
   const text = await file.text();
-  state.events.push(...parseIcs(text));
+  const imported = addImportedEvents(parseIcs(text));
   icsInput.value = "";
-  render();
+  importStatus.textContent = `Imported ${imported.length} events from file.`;
+  renderAndSave();
+}
+
+async function handleIcsUrlImport() {
+  const url = normalizeCalendarUrl(icsUrlInput.value.trim());
+  if (!url) {
+    importStatus.textContent = "Paste a public iPhone calendar link first.";
+    return;
+  }
+
+  importStatus.textContent = "Importing calendar link...";
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Calendar request failed with ${response.status}`);
+    }
+
+    const imported = addImportedEvents(parseIcs(await response.text()));
+    importStatus.textContent = `Imported ${imported.length} events from calendar link.`;
+    renderAndSave();
+  } catch (error) {
+    importStatus.textContent =
+      "Could not read that link from the browser. Export the calendar as an .ics file and import the file instead.";
+  }
 }
 
 function parseIcs(source) {
@@ -143,14 +194,32 @@ function parseIcs(source) {
       const summary = readIcsField(block, "SUMMARY");
       if (!dateValue || !summary) return null;
 
-      const isYearly = /RRULE:.*FREQ=YEARLY/.test(block);
       const omitsYear = /X-APPLE-OMIT-YEAR/.test(block);
-      const date = parseIcsDate(dateValue, currentYear, isYearly || omitsYear);
+      const date = parseIcsDate(dateValue, currentYear, omitsYear);
       if (!date) return null;
 
-      return normalizeEvent(date, `${unescapeIcs(summary)} /flag_dk`);
+      const parsed = normalizeEvent(date, `${unescapeIcs(summary)} /flag_dk`);
+      if (omitsYear) {
+        parsed.birthYear = null;
+      }
+      return parsed;
     })
     .filter(Boolean);
+}
+
+function addImportedEvents(events) {
+  const imported = events.filter((event) => {
+    const key = eventKey(event);
+    return !state.events.some((existing) => eventKey(existing) === key);
+  });
+  state.events.push(...imported);
+  return imported;
+}
+
+function eventKey(event) {
+  const [, month, day] = event.date.split("-");
+  const datePart = event.recurring && !event.birthYear ? `annual-${month}-${day}` : event.date;
+  return [datePart, event.text.toLowerCase(), event.flags.join(","), event.memberId].join("|");
 }
 
 function readIcsField(block, name) {
@@ -189,6 +258,11 @@ function render() {
   renderCalendar(selectedMonth);
   renderEventList();
   renderMembers();
+}
+
+function renderAndSave() {
+  render();
+  saveState();
 }
 
 function getSelectedMonth() {
@@ -268,7 +342,8 @@ function renderCalendarEvent(event, displayYear) {
 
 function eventOccursOn(event, date) {
   const [, month, day] = event.date.split("-").map(Number);
-  if (event.flags.length && event.birthYear && event.birthYear < date.getFullYear()) {
+  const recurring = event.recurring ?? Boolean(event.flags.length && event.birthYear);
+  if (recurring) {
     return date.getMonth() + 1 === month && date.getDate() === day;
   }
 
@@ -299,7 +374,7 @@ function renderEventList() {
       button.textContent = "Remove";
       button.addEventListener("click", () => {
         state.events = state.events.filter((entry) => entry.id !== event.id);
-        render();
+        renderAndSave();
       });
 
       item.append(text, button);
@@ -342,7 +417,7 @@ function renderMembers() {
       state.events = state.events.map((event) =>
         event.memberId === member.id ? { ...event, memberId: "" } : event,
       );
-      render();
+      renderAndSave();
     });
 
     item.append(pill, button);
@@ -352,6 +427,15 @@ function renderMembers() {
 
 function getMember(memberId) {
   return state.members.find((member) => member.id === memberId);
+}
+
+function renderFlagOptions() {
+  flagOptions.forEach((flag) => {
+    const option = document.createElement("option");
+    option.value = flag.value;
+    option.textContent = flag.label;
+    eventFlagInput.append(option);
+  });
 }
 
 function buildCalendarDays(monthDate) {
@@ -388,4 +472,72 @@ function createCell(className, text) {
   cell.className = className;
   cell.textContent = text;
   return cell;
+}
+
+function buildDateKey(year, month, day) {
+  if (!year || !month || !day) return "";
+
+  const date = new Date(year, month - 1, day);
+  const valid =
+    date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+  return valid ? toDateKey(date) : "";
+}
+
+function normalizeCalendarUrl(url) {
+  return url.startsWith("webcal://") ? `https://${url.slice("webcal://".length)}` : url;
+}
+
+function saveState() {
+  const saved = {
+    events: state.events,
+    members: state.members,
+    settings: {
+      month: monthInput.value,
+      title: titleInput.value,
+      accent: accentInput.value,
+      photoHeight: photoHeightInput.value,
+      showWeekNumbers: showWeekNumbersInput.checked,
+      hideOutsideDays: hideOutsideDaysInput.checked,
+      showMemberColors: showMemberColorsInput.checked,
+    },
+  };
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+  } catch (error) {
+    importStatus.textContent = "Browser storage is unavailable, so changes only last until refresh.";
+  }
+}
+
+function loadSavedState() {
+  let raw = "";
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch (error) {
+    return;
+  }
+  if (!raw) return;
+
+  try {
+    const saved = JSON.parse(raw);
+    state.events = Array.isArray(saved.events) ? saved.events : [];
+    state.members = Array.isArray(saved.members) ? saved.members : [];
+
+    if (saved.settings) {
+      monthInput.value = saved.settings.month || monthInput.value;
+      titleInput.value = saved.settings.title || titleInput.value;
+      accentInput.value = saved.settings.accent || accentInput.value;
+      photoHeightInput.value = saved.settings.photoHeight || photoHeightInput.value;
+      showWeekNumbersInput.checked = saved.settings.showWeekNumbers ?? showWeekNumbersInput.checked;
+      hideOutsideDaysInput.checked = saved.settings.hideOutsideDays ?? hideOutsideDaysInput.checked;
+      showMemberColorsInput.checked =
+        saved.settings.showMemberColors ?? showMemberColorsInput.checked;
+    }
+  } catch (error) {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (storageError) {
+      return;
+    }
+  }
 }

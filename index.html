@@ -67,22 +67,47 @@
 
         <div class="control-group">
           <h2>Events</h2>
-          <p class="hint">Use tokens like <code>/flag_dk</code>, <code>/flag_no</code>, or <code>/flag_se</code>.</p>
           <label>
             For
             <select id="eventMemberInput">
               <option value="">Shared</option>
             </select>
           </label>
+          <div class="event-form">
+            <label>
+              Year
+              <input id="eventYearInput" type="number" min="1" max="9999" placeholder="2001" />
+            </label>
+            <label>
+              Month
+              <input id="eventMonthInput" type="number" min="1" max="12" placeholder="5" />
+            </label>
+            <label>
+              Day
+              <input id="eventDayInput" type="number" min="1" max="31" placeholder="13" />
+            </label>
+            <label>
+              Flag
+              <select id="eventFlagInput">
+                <option value="">None</option>
+              </select>
+            </label>
+          </div>
           <label>
-            Add event
-            <textarea id="eventInput" rows="3" placeholder="2001-05-13 Name /flag_dk"></textarea>
+            Name
+            <input id="eventNameInput" type="text" placeholder="Name" />
           </label>
           <button id="addEventButton" type="button">Add event</button>
+          <label>
+            iPhone calendar link
+            <input id="icsUrlInput" type="url" placeholder="https://pXX-caldav.icloud.com/published/..." />
+          </label>
+          <button id="importUrlButton" type="button">Import calendar link</button>
           <label>
             Import .ics
             <input id="icsInput" type="file" accept=".ics,text/calendar" />
           </label>
+          <p id="importStatus" class="hint" role="status"></p>
           <ul id="eventList" class="event-list"></ul>
         </div>
 
