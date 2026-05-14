@@ -122,6 +122,17 @@ input[type="range"] {
   align-items: end;
 }
 
+.import-options {
+  display: grid;
+  gap: 9px;
+}
+
+.import-options summary {
+  cursor: pointer;
+  color: #3f4650;
+  font-size: 0.9rem;
+}
+
 .hint {
   margin: 0;
   font-size: 0.82rem;

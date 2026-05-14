@@ -102,6 +102,14 @@
             iPhone calendar link
             <input id="icsUrlInput" type="url" placeholder="https://pXX-caldav.icloud.com/published/..." />
           </label>
+          <details class="import-options">
+            <summary>Import cleanup</summary>
+            <label>
+              Birthday summary regex
+              <input id="importRegexInput" type="text" value="^(?:[^\p{L}\p{N}]+\s*)?(?<name>.*?)(?:\s*[\(\[](?<year>\d{4})[\)\]])?\s*$" />
+            </label>
+            <p class="hint">Use named groups <code>?&lt;name&gt;</code> and optionally <code>?&lt;year&gt;</code>.</p>
+          </details>
           <button id="importUrlButton" type="button">Import calendar link</button>
           <label>
             Import .ics

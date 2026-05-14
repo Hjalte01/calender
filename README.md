@@ -29,6 +29,7 @@ http://localhost:8000
 - Flagged old dates are treated as birthday-style annual events. For example, entering year `2001`, month `5`, day `13`, name `Grandma`, and `/flag_dk` renders as `Grandma (25)` when printing May 2026.
 - Supported flag tokens: `/flag_dk`, `/flag_no`, `/flag_se`.
 - Import basic `.ics` files or public calendar URLs. Calendar links work best through `node server.js`; the server only proxies the `.ics` response and does not store it.
+- Configure import cleanup with a JavaScript regex that uses named groups: `(?<name>...)` for the displayed name and optional `(?<year>...)` for age calculation.
 - Saves events, family members, and settings in browser `localStorage`; no database is required.
 - Print using the browser print dialog.
 

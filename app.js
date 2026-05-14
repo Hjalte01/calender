@@ -32,6 +32,7 @@ const eventFlagInput = document.querySelector("#eventFlagInput");
 const addEventButton = document.querySelector("#addEventButton");
 const icsUrlInput = document.querySelector("#icsUrlInput");
 const importUrlButton = document.querySelector("#importUrlButton");
+const importRegexInput = document.querySelector("#importRegexInput");
 const icsInput = document.querySelector("#icsInput");
 const importStatus = document.querySelector("#importStatus");
 const eventList = document.querySelector("#eventList");
@@ -64,6 +65,7 @@ function init() {
   showWeekNumbersInput.addEventListener("change", renderAndSave);
   hideOutsideDaysInput.addEventListener("change", renderAndSave);
   showMemberColorsInput.addEventListener("change", renderAndSave);
+  importRegexInput.addEventListener("input", renderAndSave);
   photoInput.addEventListener("change", handlePhoto);
   addMemberButton.addEventListener("click", addMember);
   addEventButton.addEventListener("click", addTypedEvent);
@@ -209,9 +211,13 @@ function parseIcs(source) {
       const date = parseIcsDate(dateValue, currentYear, omitsYear);
       if (!date) return null;
 
-      const parsed = normalizeEvent(date, `${unescapeIcs(summary)} /flag_dk`);
+      const cleaned = cleanImportedSummary(unescapeIcs(summary));
+      const parsed = normalizeEvent(date, `${cleaned.name} /flag_dk`);
       if (omitsYear) {
-        parsed.birthYear = null;
+        parsed.birthYear = cleaned.year;
+      } else if (cleaned.year) {
+        parsed.birthYear = cleaned.year;
+        parsed.date = replaceYear(parsed.date, cleaned.year);
       }
       return parsed;
     })
@@ -253,6 +259,52 @@ function unescapeIcs(value) {
     .replace(/\\,/g, ",")
     .replace(/\\;/g, ";")
     .replace(/\\\\/g, "\\");
+}
+
+function cleanImportedSummary(summary) {
+  const fallback = extractSummaryParts(summary);
+  const pattern = importRegexInput.value.trim();
+  if (!pattern) return fallback;
+
+  try {
+    const match = summary.match(new RegExp(pattern, "u"));
+    const groups = match?.groups ?? {};
+    return {
+      name: cleanName(groups.name || fallback.name),
+      year: parseBirthYear(groups.year) || fallback.year,
+    };
+  } catch (error) {
+    importStatus.textContent = "Import regex is invalid, so the default cleanup was used.";
+    return fallback;
+  }
+}
+
+function extractSummaryParts(summary) {
+  const yearMatch = summary.match(/\b(18|19|20)\d{2}\b/);
+  const name = summary.replace(/\b(18|19|20)\d{2}\b/g, "");
+  return {
+    name: cleanName(name),
+    year: parseBirthYear(yearMatch?.[0]),
+  };
+}
+
+function cleanName(value) {
+  return value
+    .replace(/\/flag_[a-z]+/gi, "")
+    .replace(/^[^\p{L}\p{N}]+/u, "")
+    .replace(/[\s()[\]{}-]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseBirthYear(value) {
+  const year = Number(value);
+  const currentYear = getSelectedMonth().getFullYear();
+  return year >= 1800 && year <= currentYear ? year : null;
+}
+
+function replaceYear(date, year) {
+  return `${year}${date.slice(4)}`;
 }
 
 function render() {
@@ -510,6 +562,7 @@ function saveState() {
       showWeekNumbers: showWeekNumbersInput.checked,
       hideOutsideDays: hideOutsideDaysInput.checked,
       showMemberColors: showMemberColorsInput.checked,
+      importRegex: importRegexInput.value,
     },
   };
 
@@ -543,6 +596,7 @@ function loadSavedState() {
       hideOutsideDaysInput.checked = saved.settings.hideOutsideDays ?? hideOutsideDaysInput.checked;
       showMemberColorsInput.checked =
         saved.settings.showMemberColors ?? showMemberColorsInput.checked;
+      importRegexInput.value = saved.settings.importRegex || importRegexInput.value;
     }
   } catch (error) {
     try {
