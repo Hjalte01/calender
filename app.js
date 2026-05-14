@@ -2,6 +2,7 @@ const state = {
   events: [],
   members: [],
   photos: {},
+  viewMode: "month",
 };
 
 const STORAGE_KEY = "photo-calendar-state-v1";
@@ -14,6 +15,8 @@ const flagOptions = [
 const monthInput = document.querySelector("#monthInput");
 const previousMonthButton = document.querySelector("#previousMonthButton");
 const nextMonthButton = document.querySelector("#nextMonthButton");
+const monthViewButton = document.querySelector("#monthViewButton");
+const yearViewButton = document.querySelector("#yearViewButton");
 const titleInput = document.querySelector("#titleInput");
 const photoInput = document.querySelector("#photoInput");
 const accentInput = document.querySelector("#accentInput");
@@ -45,6 +48,8 @@ const photoPanel = document.querySelector(".photo-panel");
 const titlePreview = document.querySelector("#titlePreview");
 const monthPreview = document.querySelector("#monthPreview");
 const calendarGrid = document.querySelector("#calendarGrid");
+const sheet = document.querySelector(".sheet");
+const yearOverview = document.querySelector("#yearOverview");
 
 const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const monthFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -63,6 +68,8 @@ function init() {
   monthInput.addEventListener("change", renderAndSave);
   previousMonthButton.addEventListener("click", () => moveMonth(-1));
   nextMonthButton.addEventListener("click", () => moveMonth(1));
+  monthViewButton.addEventListener("click", () => setViewMode("month"));
+  yearViewButton.addEventListener("click", () => setViewMode("year"));
   titleInput.addEventListener("input", renderAndSave);
   accentInput.addEventListener("input", renderAndSave);
   photoHeightInput.addEventListener("input", renderAndSave);
@@ -319,7 +326,7 @@ function render() {
   document.documentElement.style.setProperty("--accent", accentInput.value);
   document.documentElement.style.setProperty("--photo-height", `${photoHeightInput.value}%`);
 
-  titlePreview.textContent = titleInput.value || "Calendar";
+  titlePreview.textContent = titleInput.value;
   const photo = getCurrentPhoto();
   photoPreview.src = photo;
   photoPanel.classList.toggle("has-photo", Boolean(photo));
@@ -328,6 +335,8 @@ function render() {
   monthPreview.textContent = monthFormatter.format(selectedMonth);
 
   renderCalendar(selectedMonth);
+  renderYearOverview(selectedMonth.getFullYear());
+  renderViewMode();
   renderEventList();
   renderMembers();
 }
@@ -346,6 +355,11 @@ function moveMonth(offset) {
   renderAndSave();
 }
 
+function setViewMode(viewMode) {
+  state.viewMode = viewMode;
+  renderAndSave();
+}
+
 function getSelectedMonth() {
   const [year, month] = monthInput.value.split("-").map(Number);
   return new Date(year, month - 1, 1);
@@ -353,6 +367,12 @@ function getSelectedMonth() {
 
 function getCurrentPhoto() {
   return state.photos[monthInput.value] || "";
+}
+
+function renderViewMode() {
+  sheet.classList.toggle("year-mode", state.viewMode === "year");
+  monthViewButton.setAttribute("aria-pressed", String(state.viewMode === "month"));
+  yearViewButton.setAttribute("aria-pressed", String(state.viewMode === "year"));
 }
 
 function renderCalendar(monthDate) {
@@ -373,6 +393,69 @@ function renderCalendar(monthDate) {
       calendarGrid.append(renderDay(date, monthDate));
     });
   });
+}
+
+function renderYearOverview(year) {
+  yearOverview.innerHTML = "";
+
+  Array.from({ length: 12 }, (_, index) => {
+    const monthDate = new Date(year, index, 1);
+    yearOverview.append(renderYearMonth(monthDate));
+  });
+}
+
+function renderYearMonth(monthDate) {
+  const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(
+    2,
+    "0",
+  )}`;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "year-month";
+  button.classList.toggle("is-selected", monthKey === monthInput.value);
+  button.addEventListener("click", () => {
+    monthInput.value = monthKey;
+    renderAndSave();
+  });
+
+  const photo = document.createElement("div");
+  photo.className = "year-photo";
+  if (state.photos[monthKey]) {
+    const image = document.createElement("img");
+    image.src = state.photos[monthKey];
+    image.alt = "";
+    photo.append(image);
+  } else {
+    photo.textContent = "No photo";
+  }
+
+  const title = document.createElement("div");
+  title.className = "year-month-title";
+  title.textContent = monthFormatter.format(monthDate);
+
+  button.append(photo, title, renderMiniCalendar(monthDate));
+  return button;
+}
+
+function renderMiniCalendar(monthDate) {
+  const grid = document.createElement("div");
+  grid.className = "mini-calendar";
+
+  weekdays.forEach((weekday) => {
+    grid.append(createCell("mini-weekday", weekday.slice(0, 1)));
+  });
+
+  buildCalendarDays(monthDate).forEach((week) => {
+    week.forEach((date) => {
+      const day = createCell("mini-day", date.getDate());
+      if (date.getMonth() !== monthDate.getMonth()) {
+        day.classList.add("outside");
+      }
+      grid.append(day);
+    });
+  });
+
+  return grid;
 }
 
 function renderDay(date, monthDate) {
@@ -595,6 +678,7 @@ function saveState() {
       hideOutsideDays: hideOutsideDaysInput.checked,
       showMemberColors: showMemberColorsInput.checked,
       importRegex: importRegexInput.value,
+      viewMode: state.viewMode,
     },
   };
 
@@ -622,7 +706,8 @@ function loadSavedState() {
 
     if (saved.settings) {
       monthInput.value = saved.settings.month || monthInput.value;
-      titleInput.value = saved.settings.title || titleInput.value;
+      titleInput.value =
+        saved.settings.title === "Family Calendar" ? "" : saved.settings.title || titleInput.value;
       accentInput.value = saved.settings.accent || accentInput.value;
       photoHeightInput.value = saved.settings.photoHeight || photoHeightInput.value;
       showWeekNumbersInput.checked = saved.settings.showWeekNumbers ?? showWeekNumbersInput.checked;
@@ -630,6 +715,7 @@ function loadSavedState() {
       showMemberColorsInput.checked =
         saved.settings.showMemberColors ?? showMemberColorsInput.checked;
       importRegexInput.value = saved.settings.importRegex || importRegexInput.value;
+      state.viewMode = saved.settings.viewMode || state.viewMode;
     }
   } catch (error) {
     try {

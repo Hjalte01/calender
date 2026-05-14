@@ -19,9 +19,13 @@
             </label>
             <button id="nextMonthButton" class="icon-button" type="button" aria-label="Next month">›</button>
           </div>
+          <div class="view-row" aria-label="Preview mode">
+            <button id="monthViewButton" type="button" aria-pressed="true">Month</button>
+            <button id="yearViewButton" type="button" aria-pressed="false">Year</button>
+          </div>
           <label>
             Title
-            <input id="titleInput" type="text" value="Family Calendar" />
+            <input id="titleInput" type="text" value="" />
           </label>
           <label>
             Photo for this month
@@ -134,7 +138,7 @@
           <img id="photoPreview" alt="" />
           <div id="photoPlaceholder" class="photo-placeholder">Choose a photo</div>
           <div class="calendar-title">
-            <span id="titlePreview">Family Calendar</span>
+            <span id="titlePreview"></span>
             <strong id="monthPreview"></strong>
           </div>
         </header>
@@ -142,6 +146,8 @@
         <div class="calendar-wrap">
           <div id="calendarGrid" class="calendar-grid"></div>
         </div>
+
+        <div id="yearOverview" class="year-overview"></div>
       </section>
     </main>
 
