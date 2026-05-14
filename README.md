@@ -24,7 +24,7 @@ http://localhost:8000
 - Navigate months with previous/next controls.
 - Switch to year overview to see all 12 months at once and select the month you want to edit.
 - Upload a separate photo for each month.
-- Manage month photos from an image drawer where photos can be assigned, swapped, or removed.
+- Manage month photos from an image drawer where photos can be bulk-added, assigned, swapped, or removed.
 - Use top control tabs for Main, Style, Family, and Events instead of one long sidebar.
 - Change title, accent color, photo height, and week numbers.
 - Optionally hide dates from previous and next months.

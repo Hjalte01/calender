@@ -54,6 +54,20 @@ textarea {
   background: #f8f4ec;
 }
 
+.drawer-toggle {
+  position: sticky;
+  top: 24px;
+  z-index: 3;
+  align-self: start;
+  justify-self: end;
+  width: 42px;
+  min-height: 42px;
+  padding: 0;
+  color: #fff;
+  background: var(--accent);
+  font-size: 1.25rem;
+}
+
 .control-group {
   display: grid;
   gap: 12px;
@@ -192,12 +206,6 @@ input[type="range"] {
   margin: 0;
   font-size: 0.82rem;
   color: var(--muted);
-}
-
-.actions {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
 }
 
 button {
@@ -351,7 +359,8 @@ button + button {
 
 .image-actions button {
   min-height: 34px;
-  padding: 6px 8px;
+  padding: 6px 5px;
+  font-size: 0.78rem;
 }
 
 .sheet {

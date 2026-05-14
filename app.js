@@ -52,6 +52,8 @@ const clearButton = document.querySelector("#clearButton");
 const imageDrawerButton = document.querySelector("#imageDrawerButton");
 const imageDrawer = document.querySelector("#imageDrawer");
 const closeImageDrawerButton = document.querySelector("#closeImageDrawerButton");
+const bulkPhotoInput = document.querySelector("#bulkPhotoInput");
+const autoAssignImagesButton = document.querySelector("#autoAssignImagesButton");
 const imageList = document.querySelector("#imageList");
 const photoPreview = document.querySelector("#photoPreview");
 const photoPanel = document.querySelector(".photo-panel");
@@ -104,6 +106,8 @@ function init() {
   icsInput.addEventListener("change", handleIcsImport);
   imageDrawerButton.addEventListener("click", () => toggleImageDrawer());
   closeImageDrawerButton.addEventListener("click", () => toggleImageDrawer(false));
+  bulkPhotoInput.addEventListener("change", handleBulkPhotos);
+  autoAssignImagesButton.addEventListener("click", autoAssignImages);
   printButton.addEventListener("click", () => window.print());
   clearButton.addEventListener("click", () => {
     state.events = [];
@@ -144,6 +148,43 @@ function handlePhoto(event) {
     renderAndSave();
   });
   reader.readAsDataURL(file);
+}
+
+async function handleBulkPhotos(event) {
+  const files = [...(event.target.files ?? [])];
+  if (!files.length) return;
+
+  const startDate = getSelectedMonth();
+  const images = await Promise.all(files.map(readFileAsDataUrl));
+  images.forEach((image, index) => {
+    const month = new Date(startDate);
+    month.setMonth(startDate.getMonth() + index);
+    state.photos[toMonthKey(month)] = image;
+  });
+
+  bulkPhotoInput.value = "";
+  renderAndSave();
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(reader.result));
+    reader.readAsDataURL(file);
+  });
+}
+
+function autoAssignImages() {
+  const photos = Object.entries(state.photos)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, photo]) => photo);
+  const startDate = getSelectedMonth();
+  photos.forEach((photo, index) => {
+    const month = new Date(startDate);
+    month.setMonth(startDate.getMonth() + index);
+    state.photos[toMonthKey(month)] = photo;
+  });
+  renderAndSave();
 }
 
 function openPhotoPicker(monthKey) {
@@ -410,9 +451,24 @@ function getCurrentPhoto() {
   return state.photos[monthInput.value] || "";
 }
 
+function toMonthKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
 function monthKeyToDate(monthKey) {
   const [year, month] = monthKey.split("-").map(Number);
   return new Date(year, month - 1, 1);
+}
+
+function buildMonthOptions() {
+  const selectedDate = getSelectedMonth();
+  return Array.from({ length: 12 }, (_, index) => {
+    const date = new Date(selectedDate.getFullYear(), index, 1);
+    const option = document.createElement("option");
+    option.value = toMonthKey(date);
+    option.textContent = monthFormatter.format(date);
+    return option;
+  });
 }
 
 function renderViewMode() {
@@ -471,6 +527,17 @@ function renderImageItem(monthKey, photo) {
   meta.className = "image-meta";
   meta.textContent = monthFormatter.format(monthKeyToDate(monthKey));
 
+  const monthSelect = document.createElement("select");
+  monthSelect.value = monthKey;
+  buildMonthOptions().forEach((option) => monthSelect.append(option));
+  monthSelect.addEventListener("change", () => {
+    state.photos[monthSelect.value] = photo;
+    if (monthSelect.value !== monthKey) {
+      delete state.photos[monthKey];
+    }
+    renderAndSave();
+  });
+
   const actions = document.createElement("div");
   actions.className = "image-actions";
 
@@ -506,7 +573,7 @@ function renderImageItem(monthKey, photo) {
   });
 
   actions.append(assignButton, swapButton, removeButton);
-  item.append(thumb, meta, actions);
+  item.append(thumb, meta, monthSelect, actions);
   return item;
 }
 

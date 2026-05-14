@@ -38,6 +38,7 @@
             Photo for this month
             <input id="photoInput" type="file" accept="image/*" />
           </label>
+          <button id="printButton" type="button">Print</button>
         </div>
 
         <div class="control-group is-hidden" data-panel="style">
@@ -130,16 +131,13 @@
             Import .ics
             <input id="icsInput" type="file" accept=".ics,text/calendar" />
           </label>
+          <button id="clearButton" type="button">Clear events</button>
           <p id="importStatus" class="hint" role="status"></p>
           <ul id="eventList" class="event-list"></ul>
         </div>
-
-        <div class="actions">
-          <button id="imageDrawerButton" type="button" aria-pressed="false">Images</button>
-          <button id="printButton" type="button">Print</button>
-          <button id="clearButton" type="button">Clear events</button>
-        </div>
       </aside>
+
+      <button id="imageDrawerButton" class="drawer-toggle" type="button" aria-pressed="false" aria-label="Open images">☰</button>
 
       <section class="sheet" aria-label="Printable calendar preview">
         <header class="photo-panel" role="button" tabindex="0" aria-label="Choose photo for this month">
@@ -164,6 +162,11 @@
           <button id="closeImageDrawerButton" class="icon-button" type="button" aria-label="Close images">×</button>
         </div>
         <p class="hint">Assign, swap, or remove photos for the selected month.</p>
+        <label>
+          Add images
+          <input id="bulkPhotoInput" type="file" accept="image/*" multiple />
+        </label>
+        <button id="autoAssignImagesButton" type="button">Auto-assign from selected month</button>
         <div id="imageList" class="image-list"></div>
       </aside>
     </main>
