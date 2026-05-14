@@ -1,7 +1,16 @@
 :root {
   --accent: #bd1f2d;
-  --photo-height: 32%;
+  --photo-height: 50%;
+  --paper-width: 210mm;
+  --paper-height: 297mm;
+  --paper-aspect: 210 / 297;
+  --preview-scale: 1;
   --year-preview-scale: 0.3;
+  --title-font-size: 3rem;
+  --month-title-font-size: 1.8rem;
+  --calendar-label-font-size: 0.74rem;
+  --calendar-day-font-size: 0.85rem;
+  --event-font-size: 0.76rem;
   --paper: #fffdf8;
   --ink: #1f2328;
   --muted: #69707a;
@@ -75,8 +84,14 @@ textarea {
 }
 
 .control-group.is-hidden,
-.image-drawer.is-hidden {
+.image-drawer.is-hidden,
+.advanced-font.is-hidden {
   display: none;
+}
+
+.advanced-font {
+  display: grid;
+  gap: 10px;
 }
 
 .control-tabs {
@@ -162,6 +177,18 @@ textarea {
 input[type="color"] {
   min-height: 42px;
   padding: 4px;
+}
+
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 input[type="range"] {
@@ -374,22 +401,79 @@ button + button {
   font-size: 0.78rem;
 }
 
+.preview-pane {
+  align-self: start;
+  position: sticky;
+  top: 24px;
+  height: calc(100vh - 48px);
+  min-height: 420px;
+  overflow: hidden;
+}
+
 .sheet {
-  width: min(100%, 210mm);
-  aspect-ratio: 210 / 297;
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: var(--paper-width);
+  height: var(--paper-height);
+  aspect-ratio: var(--paper-aspect);
   margin: 0 auto;
   overflow: hidden;
   background: var(--paper);
   box-shadow: 0 18px 50px rgb(36 31 24 / 22%);
+  transform: translateX(-50%) scale(var(--preview-scale));
+  transform-origin: top center;
 }
 
 .print-stack {
   display: none;
 }
 
+.pdf-export-layer {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: var(--paper-width);
+  height: var(--paper-height);
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.pdf-export-page {
+  width: var(--paper-width);
+  height: var(--paper-height);
+  margin: 0;
+  overflow: hidden;
+  background: var(--paper);
+  box-shadow: none;
+}
+
+.pdf-export-page .print-photo-panel {
+  position: relative;
+  height: var(--photo-height);
+  min-height: 0;
+  overflow: hidden;
+  border-bottom: var(--photo-accent-width) solid var(--accent);
+  background: #d9d1c4;
+}
+
+.pdf-export-page .print-photo-panel img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pdf-export-page .calendar-wrap {
+  height: calc(100% - var(--photo-height));
+  padding: 18px;
+}
+
 .sheet.year-mode {
+  position: static;
+  width: min(100%, 210mm);
+  transform: none;
   aspect-ratio: auto;
-  height: calc(100vh - 48px);
+  height: 100%;
   min-height: 0;
   overflow: auto;
 }
@@ -402,7 +486,7 @@ button + button {
 .photo-panel {
   position: relative;
   height: var(--photo-height);
-  min-height: 180px;
+  min-height: 0;
   overflow: hidden;
   border-bottom: var(--photo-accent-width) solid var(--accent);
   background: #d9d1c4;
@@ -452,18 +536,22 @@ button + button {
 }
 
 .calendar-title span {
-  font-size: clamp(1.5rem, 4vw, 3rem);
+  font-size: var(--title-font-size);
   font-weight: 800;
 }
 
 .calendar-title strong {
-  font-size: clamp(1rem, 2vw, 1.8rem);
+  font-size: var(--month-title-font-size);
   text-transform: uppercase;
 }
 
 .calendar-wrap {
   height: calc(100% - var(--photo-height));
   padding: 18px;
+}
+
+.calendar-wrap:empty {
+  display: none;
 }
 
 .calendar-grid {
@@ -485,7 +573,7 @@ button + button {
 
 .sheet.year-mode .year-overview {
   display: grid;
-  grid-template-columns: repeat(3, calc(210mm * var(--year-preview-scale)));
+  grid-template-columns: repeat(3, calc(var(--paper-width) * var(--year-preview-scale)));
   justify-content: center;
   gap: 8px;
   padding: 8px;
@@ -495,8 +583,8 @@ button + button {
   box-sizing: content-box;
   position: relative;
   display: block;
-  width: calc(210mm * var(--year-preview-scale));
-  height: calc(297mm * var(--year-preview-scale));
+  width: calc(var(--paper-width) * var(--year-preview-scale));
+  height: calc(var(--paper-height) * var(--year-preview-scale));
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -514,8 +602,8 @@ button + button {
 }
 
 .year-preview-page {
-  width: 210mm;
-  height: 297mm;
+  width: var(--paper-width);
+  height: var(--paper-height);
   overflow: hidden;
   background: var(--paper);
   transform: scale(var(--year-preview-scale));
@@ -552,16 +640,17 @@ button + button {
 .week-number {
   display: grid;
   place-items: center;
-  min-height: 28px;
+  min-height: 0;
   color: var(--muted);
   background: #f4efe5;
-  font-size: 0.74rem;
+  font-size: var(--calendar-label-font-size);
   font-weight: 700;
   text-transform: uppercase;
 }
 
 .day {
-  min-height: 78px;
+  min-height: 0;
+  overflow: hidden;
   padding: 6px;
   background: #fffdf8;
 }
@@ -584,8 +673,8 @@ button + button {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  min-height: 18px;
-  font-size: 0.85rem;
+  min-height: 0;
+  font-size: var(--calendar-day-font-size);
   font-weight: 700;
 }
 
@@ -593,22 +682,33 @@ button + button {
   display: grid;
   gap: 3px;
   margin-top: 4px;
+  overflow: hidden;
 }
 
 .event {
+  position: relative;
   display: flex;
   gap: 4px;
   align-items: center;
   min-width: 0;
-  padding: 2px 3px;
-  border-left: 3px solid transparent;
+  padding: 2px 3px 2px 0;
   border-radius: 3px;
-  font-size: clamp(0.54rem, 0.75vw, 0.76rem);
+  font-size: var(--event-font-size);
   line-height: 1.15;
 }
 
+.event.has-member-color::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--member-color);
+}
+
 .event.has-member-color {
-  border-left-color: var(--member-color);
   background: color-mix(in srgb, var(--member-color) 13%, transparent);
 }
 
@@ -621,9 +721,8 @@ button + button {
   position: relative;
   display: inline-block;
   flex: 0 0 auto;
-  width: 18px;
-  height: 12px;
-  border: 1px solid rgb(0 0 0 / 18%);
+  width: 1.5em;
+  height: 1em;
   background: #c8102e;
 }
 
@@ -635,17 +734,17 @@ button + button {
 }
 
 .flag::before {
-  left: 5px;
+  left: 0.42em;
   top: 0;
-  width: 2px;
+  width: 0.16em;
   height: 100%;
 }
 
 .flag::after {
   left: 0;
-  top: 5px;
+  top: 0.42em;
   width: 100%;
-  height: 2px;
+  height: 0.16em;
 }
 
 .flag-no {
@@ -681,18 +780,32 @@ button + button {
     max-height: none;
   }
 
+  .preview-pane {
+    position: static;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .sheet {
+    position: static;
+    width: min(100%, var(--paper-width));
+    height: auto;
+    transform: none;
+  }
+
   .event-form {
     grid-template-columns: 1fr 1fr;
   }
 
   .sheet.year-mode .year-overview {
-    grid-template-columns: repeat(2, calc(210mm * var(--year-preview-scale)));
+    grid-template-columns: repeat(2, calc(var(--paper-width) * var(--year-preview-scale)));
   }
 }
 
 @media (max-width: 560px) {
   .sheet.year-mode .year-overview {
-    grid-template-columns: calc(210mm * var(--year-preview-scale));
+    grid-template-columns: calc(var(--paper-width) * var(--year-preview-scale));
   }
 }
 
@@ -715,8 +828,8 @@ button + button {
   }
 
   .print-page {
-    width: 210mm;
-    height: 297mm;
+    width: var(--paper-width);
+    height: var(--paper-height);
     margin: 0;
     overflow: hidden;
     background: var(--paper);
@@ -733,7 +846,7 @@ button + button {
   .print-photo-panel {
     position: relative;
     height: var(--photo-height);
-    min-height: 180px;
+    min-height: 0;
     overflow: hidden;
     border-bottom: var(--photo-accent-width) solid var(--accent);
     background: #d9d1c4;

@@ -14,6 +14,25 @@ const state = {
 
 const STORAGE_KEY = "photo-calendar-state-v1";
 const EXTRA_PHOTO_LIMIT = 10;
+const YEAR_PREVIEW_WIDTH = 63;
+const styleDefaults = {
+  accent: "#bd1f2d",
+  photoHeight: "50",
+  calendarFontSize: "100",
+  calendarTextFont: "100",
+  titleFont: "100",
+  monthTitleFont: "100",
+  calendarLabelFont: "100",
+  showWeekNumbers: true,
+  hideOutsideDays: true,
+  showMemberColors: true,
+  showPhotoAccent: true,
+};
+const paperSizes = {
+  a3: { label: "A3", pageRule: "A3 portrait", width: 297, height: 420 },
+  a4: { label: "A4", pageRule: "A4 portrait", width: 210, height: 297 },
+  a5: { label: "A5", pageRule: "A5 portrait", width: 148, height: 210 },
+};
 const flagOptions = [
   { value: "dk", label: "/flag_dk" },
   { value: "no", label: "/flag_no" },
@@ -35,6 +54,7 @@ let photoVersion = 0;
 
 const monthInput = document.querySelector("#monthInput");
 const app = document.querySelector("#app");
+const previewPane = document.querySelector("#previewPane");
 const previousMonthButton = document.querySelector("#previousMonthButton");
 const nextMonthButton = document.querySelector("#nextMonthButton");
 const monthViewButton = document.querySelector("#monthViewButton");
@@ -47,10 +67,19 @@ const controlTabs = [...document.querySelectorAll(".control-tab")];
 const controlPanels = [...document.querySelectorAll("[data-panel]")];
 const accentInput = document.querySelector("#accentInput");
 const photoHeightInput = document.querySelector("#photoHeightInput");
+const calendarFontSizeInput = document.querySelector("#calendarFontSizeInput");
+const advancedFontButton = document.querySelector("#advancedFontButton");
+const advancedFontControls = document.querySelector("#advancedFontControls");
+const calendarTextFontInput = document.querySelector("#calendarTextFontInput");
+const titleFontInput = document.querySelector("#titleFontInput");
+const monthTitleFontInput = document.querySelector("#monthTitleFontInput");
+const calendarLabelFontInput = document.querySelector("#calendarLabelFontInput");
+const paperSizeInput = document.querySelector("#paperSizeInput");
 const showWeekNumbersInput = document.querySelector("#showWeekNumbersInput");
 const hideOutsideDaysInput = document.querySelector("#hideOutsideDaysInput");
 const showMemberColorsInput = document.querySelector("#showMemberColorsInput");
 const showPhotoAccentInput = document.querySelector("#showPhotoAccentInput");
+const resetStyleButton = document.querySelector("#resetStyleButton");
 const memberNameInput = document.querySelector("#memberNameInput");
 const memberColorInput = document.querySelector("#memberColorInput");
 const addMemberButton = document.querySelector("#addMemberButton");
@@ -68,6 +97,7 @@ const importRegexInput = document.querySelector("#importRegexInput");
 const icsInput = document.querySelector("#icsInput");
 const importStatus = document.querySelector("#importStatus");
 const eventList = document.querySelector("#eventList");
+const downloadPdfButton = document.querySelector("#downloadPdfButton");
 const printButton = document.querySelector("#printButton");
 const clearButton = document.querySelector("#clearButton");
 const imageDrawerButton = document.querySelector("#imageDrawerButton");
@@ -116,10 +146,18 @@ function init() {
   printEndInput.addEventListener("change", renderAndSave);
   accentInput.addEventListener("input", renderAndSave);
   photoHeightInput.addEventListener("input", renderAndSave);
+  calendarFontSizeInput.addEventListener("input", renderAndSave);
+  advancedFontButton.addEventListener("click", toggleAdvancedFonts);
+  calendarTextFontInput.addEventListener("input", renderAndSave);
+  titleFontInput.addEventListener("input", renderAndSave);
+  monthTitleFontInput.addEventListener("input", renderAndSave);
+  calendarLabelFontInput.addEventListener("input", renderAndSave);
+  paperSizeInput.addEventListener("change", renderAndSave);
   showWeekNumbersInput.addEventListener("change", renderAndSave);
   hideOutsideDaysInput.addEventListener("change", renderAndSave);
   showMemberColorsInput.addEventListener("change", renderAndSave);
   showPhotoAccentInput.addEventListener("change", renderAndSave);
+  resetStyleButton.addEventListener("click", resetStyleSettings);
   importRegexInput.addEventListener("input", renderAndSave);
   photoInput.addEventListener("change", handlePhoto);
   photoPanel.addEventListener("click", () => {
@@ -135,6 +173,7 @@ function init() {
   addEventButton.addEventListener("click", addTypedEvent);
   importUrlButton.addEventListener("click", handleIcsUrlImport);
   icsInput.addEventListener("change", handleIcsImport);
+  downloadPdfButton.addEventListener("click", downloadPdf);
   imageDrawerButton.addEventListener("click", () => toggleImageDrawer());
   bulkPhotoInput.addEventListener("change", handleBulkPhotos);
   monthImagesTabButton.addEventListener("click", () => setImageDrawerTab("images"));
@@ -143,6 +182,7 @@ function init() {
   sampleImageButton.addEventListener("click", () => addSampleImages(1));
   printButton.addEventListener("click", printCalendar);
   window.addEventListener("beforeprint", renderPrintStack);
+  window.addEventListener("resize", updatePreviewScale);
   clearButton.addEventListener("click", () => {
     state.events = [];
     renderAndSave();
@@ -497,8 +537,19 @@ function replaceYear(date, year) {
 }
 
 function render() {
+  const paperSize = paperSizes[paperSizeInput.value] ?? paperSizes.a4;
   document.documentElement.style.setProperty("--accent", accentInput.value);
   document.documentElement.style.setProperty("--photo-height", `${photoHeightInput.value}%`);
+  setCalendarFontProperties();
+  document.documentElement.style.setProperty("--paper-width", `${paperSize.width}mm`);
+  document.documentElement.style.setProperty("--paper-height", `${paperSize.height}mm`);
+  document.documentElement.style.setProperty("--paper-aspect", `${paperSize.width} / ${paperSize.height}`);
+  document.documentElement.style.setProperty(
+    "--year-preview-scale",
+    String(YEAR_PREVIEW_WIDTH / paperSize.width),
+  );
+  updatePreviewScale();
+  updatePrintPageSize(paperSize);
   document.documentElement.style.setProperty(
     "--photo-accent-width",
     showPhotoAccentInput.checked ? "7px" : "0px",
@@ -527,9 +578,73 @@ function render() {
   }
 }
 
+function setCalendarFontProperties() {
+  document.documentElement.style.setProperty(
+    "--title-font-size",
+    `${3 * getFontScale("title")}rem`,
+  );
+  document.documentElement.style.setProperty(
+    "--month-title-font-size",
+    `${1.8 * getFontScale("monthTitle")}rem`,
+  );
+  document.documentElement.style.setProperty(
+    "--calendar-label-font-size",
+    `${0.74 * getFontScale("calendarLabel")}rem`,
+  );
+  document.documentElement.style.setProperty(
+    "--calendar-day-font-size",
+    `${0.85 * getFontScale("calendarText")}rem`,
+  );
+  document.documentElement.style.setProperty(
+    "--event-font-size",
+    `${0.76 * getFontScale("calendarText")}rem`,
+  );
+}
+
+function updatePreviewScale() {
+  const paperSize = paperSizes[paperSizeInput.value] ?? paperSizes.a4;
+  const paperWidth = (paperSize.width * 96) / 25.4;
+  const paperHeight = (paperSize.height * 96) / 25.4;
+  const availableWidth = previewPane.clientWidth;
+  const availableHeight = previewPane.clientHeight;
+  const scale = Math.min(1, availableWidth / paperWidth, availableHeight / paperHeight);
+  document.documentElement.style.setProperty("--preview-scale", String(Math.max(0.1, scale)));
+}
+
+function updatePrintPageSize(paperSize) {
+  let style = document.querySelector("#printPageSizeStyle");
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "printPageSizeStyle";
+    document.head.append(style);
+  }
+  style.textContent = `@page { size: ${paperSize.pageRule}; margin: 0; }`;
+}
+
 function renderAndSave() {
   render();
   scheduleSave();
+}
+
+function resetStyleSettings() {
+  accentInput.value = styleDefaults.accent;
+  photoHeightInput.value = styleDefaults.photoHeight;
+  calendarFontSizeInput.value = styleDefaults.calendarFontSize;
+  calendarTextFontInput.value = styleDefaults.calendarTextFont;
+  titleFontInput.value = styleDefaults.titleFont;
+  monthTitleFontInput.value = styleDefaults.monthTitleFont;
+  calendarLabelFontInput.value = styleDefaults.calendarLabelFont;
+  showWeekNumbersInput.checked = styleDefaults.showWeekNumbers;
+  hideOutsideDaysInput.checked = styleDefaults.hideOutsideDays;
+  showMemberColorsInput.checked = styleDefaults.showMemberColors;
+  showPhotoAccentInput.checked = styleDefaults.showPhotoAccent;
+  renderAndSave();
+}
+
+function toggleAdvancedFonts() {
+  const expanded = advancedFontButton.getAttribute("aria-expanded") === "true";
+  advancedFontButton.setAttribute("aria-expanded", String(!expanded));
+  advancedFontControls.classList.toggle("is-hidden", expanded);
 }
 
 function printCalendar() {
@@ -538,13 +653,354 @@ function printCalendar() {
   window.print();
 }
 
+async function downloadPdf() {
+  const paperSize = paperSizes[paperSizeInput.value] ?? paperSizes.a4;
+  const months = buildPrintMonths();
+  downloadPdfButton.disabled = true;
+  downloadPdfButton.textContent = "Building PDF...";
+
+  try {
+    const pdf = new PdfDocument(mmToPt(paperSize.width), mmToPt(paperSize.height));
+    for (const monthDate of months) {
+      await addCapturedCalendarPdfPage(pdf, monthDate, paperSize);
+    }
+    const blob = pdf.toBlob();
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = buildPdfFileName(months, paperSize);
+    link.click();
+    URL.revokeObjectURL(url);
+    saveState();
+  } catch (error) {
+    importStatus.textContent = "Could not build PDF. Use Print as a fallback.";
+  } finally {
+    downloadPdfButton.disabled = false;
+    downloadPdfButton.textContent = "Download PDF";
+  }
+}
+
+async function addCapturedCalendarPdfPage(pdf, monthDate, paperSize) {
+  const image = await capturePrintPageImage(monthDate, paperSize);
+  const page = pdf.addPage();
+  page.imageCover(image, 0, 0, pdf.pageWidth, pdf.pageHeight);
+}
+
+async function capturePrintPageImage(monthDate, paperSize) {
+  const page = renderPrintMonth(monthDate);
+  page.classList.add("pdf-export-page");
+
+  const layer = document.createElement("div");
+  layer.className = "pdf-export-layer";
+  layer.style.cssText = document.documentElement.style.cssText;
+  layer.append(page);
+  document.body.append(layer);
+
+  try {
+    await inlinePageImages(page);
+    await document.fonts?.ready;
+    const width = Math.round((paperSize.width * 96) / 25.4);
+    const height = Math.round((paperSize.height * 96) / 25.4);
+    const scale = 2;
+    const svg = buildForeignObjectSvg(layer, width, height);
+    const image = await loadSvgImage(svg);
+    const canvas = document.createElement("canvas");
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    const context = canvas.getContext("2d");
+    context.scale(scale, scale);
+    context.drawImage(image, 0, 0, width, height);
+    return loadPdfImage(canvas.toDataURL("image/jpeg", 0.92));
+  } finally {
+    layer.remove();
+  }
+}
+
+async function inlinePageImages(page) {
+  const images = [...page.querySelectorAll("img")];
+  await Promise.all(
+    images.map(async (image) => {
+      if (image.src.startsWith("data:")) return;
+      try {
+        image.src = await fetchImageAsDataUrl(image.src);
+      } catch (error) {
+        image.removeAttribute("src");
+      }
+    }),
+  );
+  await Promise.all(
+    images.map((image) =>
+      image.complete
+        ? Promise.resolve()
+        : new Promise((resolve) => {
+            image.addEventListener("load", resolve, { once: true });
+            image.addEventListener("error", resolve, { once: true });
+          }),
+    ),
+  );
+}
+
+function buildForeignObjectSvg(layer, width, height) {
+  const css = getDocumentCss();
+  const captureLayer = layer.cloneNode(true);
+  captureLayer.style.position = "static";
+  captureLayer.style.left = "0";
+  captureLayer.style.top = "0";
+  const html = new XMLSerializer().serializeToString(captureLayer);
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+      <foreignObject width="100%" height="100%">
+        <div xmlns="http://www.w3.org/1999/xhtml">
+          <style>${css}</style>
+          ${html}
+        </div>
+      </foreignObject>
+    </svg>`,
+  )}`;
+}
+
+function getDocumentCss() {
+  return [...document.styleSheets]
+    .map((sheet) => {
+      try {
+        return [...sheet.cssRules].map((rule) => rule.cssText).join("\n");
+      } catch (error) {
+        return "";
+      }
+    })
+    .join("\n");
+}
+
+function loadSvgImage(source) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener("load", () => resolve(image), { once: true });
+    image.addEventListener("error", reject, { once: true });
+    image.src = source;
+  });
+}
+
+async function addCalendarPdfPage(pdf, monthDate, paperSize) {
+  const page = pdf.addPage();
+  const pageWidth = mmToPt(paperSize.width);
+  const pageHeight = mmToPt(paperSize.height);
+  const photoRatio = Number(photoHeightInput.value) / 100;
+  const photoHeight = pageHeight * photoRatio;
+  const accentHeight = showPhotoAccentInput.checked ? 5.25 : 0;
+  const padding = 13.5;
+  const monthKey = toMonthKey(monthDate);
+  const photo = state.photos[monthKey] || "";
+
+  page.fill("#fffdf8");
+  page.rect(0, 0, pageWidth, pageHeight, "f");
+  if (photoHeight > 0) {
+    page.fill("#d9d1c4");
+    page.rect(0, 0, pageWidth, photoHeight, "f");
+
+    const image = await loadPdfImage(photo);
+    if (image) {
+      page.imageCover(image, 0, 0, pageWidth, photoHeight);
+    } else {
+      page.fill("#5c6570");
+      page.text("Choose a photo", pageWidth / 2 - 48, photoHeight / 2, 16, "Helvetica-Bold");
+    }
+
+    if (accentHeight) {
+      page.fill(accentInput.value);
+      page.rect(0, Math.max(0, photoHeight - accentHeight), pageWidth, Math.min(accentHeight, photoHeight), "f");
+    }
+
+    page.fill("#ffffff");
+    page.text(
+      titleInput.value || "",
+      18,
+      Math.max(18, photoHeight - 20),
+      26 * getFontScale("title"),
+      "Helvetica-Bold",
+    );
+    page.text(
+      monthFormatter.format(monthDate).toUpperCase(),
+      pageWidth - 126,
+      Math.max(18, photoHeight - 20),
+      14 * getFontScale("monthTitle"),
+      "Helvetica-Bold",
+    );
+  }
+
+  if (photoRatio < 1) {
+    drawPdfCalendarGrid(page, monthDate, {
+      x: padding,
+      y: photoHeight + padding,
+      width: pageWidth - padding * 2,
+      height: pageHeight - photoHeight - padding * 2,
+    });
+  }
+}
+
+function drawPdfCalendarGrid(page, monthDate, box) {
+  const weeks = buildCalendarDays(monthDate);
+  const hasWeeks = showWeekNumbersInput.checked;
+  const columns = hasWeeks ? [0.45, 1, 1, 1, 1, 1, 1, 1] : [1, 1, 1, 1, 1, 1, 1];
+  const totalColumns = columns.reduce((sum, value) => sum + value, 0);
+  const headerRows = 1;
+  const rowHeight = box.height / (weeks.length + headerRows);
+  const columnWidths = columns.map((value) => (box.width * value) / totalColumns);
+  const columnX = columnWidths.reduce(
+    (positions, width) => [...positions, positions[positions.length - 1] + width],
+    [box.x],
+  );
+
+  page.stroke("#d8d2c7");
+  page.lineWidth(0.75);
+  if (hasWeeks) {
+    drawPdfHeaderCell(page, "", columnX[0], box.y, columnWidths[0], rowHeight);
+  }
+  weekdays.forEach((weekday, index) => {
+    const column = hasWeeks ? index + 1 : index;
+    drawPdfHeaderCell(page, weekday, columnX[column], box.y, columnWidths[column], rowHeight);
+  });
+
+  weeks.forEach((week, weekIndex) => {
+    const y = box.y + rowHeight * (weekIndex + headerRows);
+    if (hasWeeks) {
+      drawPdfHeaderCell(page, String(getIsoWeek(week[0])), columnX[0], y, columnWidths[0], rowHeight);
+    }
+
+    week.forEach((date, dayIndex) => {
+      const outsideMonth = date.getMonth() !== monthDate.getMonth();
+      const hidden = outsideMonth && hideOutsideDaysInput.checked;
+      const column = hasWeeks ? dayIndex + 1 : dayIndex;
+      const x = columnX[column];
+      const width = columnWidths[column];
+      page.fill(outsideMonth ? "#f7f2e9" : "#fffdf8");
+      page.rect(x, y, width, rowHeight, "f");
+      page.stroke("#d8d2c7");
+      page.rect(x, y, width, rowHeight, "s");
+      if (!hidden) {
+        drawPdfDay(page, date, x, y, width, rowHeight, outsideMonth);
+      }
+    });
+  });
+}
+
+function drawPdfHeaderCell(page, text, x, y, width, height) {
+  const fontScale = getFontScale("calendarLabel");
+  page.fill("#f4efe5");
+  page.rect(x, y, width, height, "f");
+  page.stroke("#d8d2c7");
+  page.rect(x, y, width, height, "s");
+  page.fill("#69707a");
+  page.text(
+    String(text).toUpperCase(),
+    x + width / 2 - String(text).length * 2.4 * fontScale,
+    y + height / 2 + 2,
+    8 * fontScale,
+    "Helvetica-Bold",
+  );
+}
+
+function drawPdfDay(page, date, x, y, width, height, outsideMonth) {
+  const fontScale = getFontScale("calendarText");
+  page.fill(outsideMonth ? "#9ea4aa" : "#1f2328");
+  page.text(String(date.getDate()), x + 5, y + 13, 8.5 * fontScale, "Helvetica-Bold");
+
+  const events = state.events.filter((item) => eventOccursOn(item, date));
+  let eventY = y + 23;
+  const eventStep = 10 * fontScale;
+  events.slice(0, Math.max(1, Math.floor((height - 24) / eventStep))).forEach((event) => {
+    const member = getMember(event.memberId);
+    let textX = x + 5;
+    if (member && showMemberColorsInput.checked) {
+      page.fill(member.color);
+      page.rect(x + 2, eventY - 7, 2, 8, "f");
+    }
+    event.flags.forEach((flag) => {
+      drawPdfFlag(page, flag, textX, eventY - 7, 10 * fontScale, 6.5 * fontScale);
+      textX += 12 * fontScale;
+    });
+    page.fill("#1f2328");
+    page.text(formatEventText(event, date.getFullYear()), textX, eventY, 6.4 * fontScale, "Helvetica");
+    eventY += eventStep;
+  });
+}
+
+function getFontScale(section, includeOverall = true) {
+  const overallValue = Number(calendarFontSizeInput.value) / 100 || 1;
+  if (section === "overall") return overallValue;
+  const overall = includeOverall ? overallValue : 1;
+  const baseInput =
+    {
+      calendarText: calendarTextFontInput,
+      title: titleFontInput,
+      monthTitle: monthTitleFontInput,
+      calendarLabel: calendarLabelFontInput,
+    }[section] || calendarFontSizeInput;
+  return overall * (Number(baseInput.value) / 100 || 1);
+}
+
+function drawPdfFlag(page, flag, x, y, width, height) {
+  const isSweden = flag === "se";
+  page.fill(isSweden ? "#006aa7" : flag === "no" ? "#ba0c2f" : "#c8102e");
+  page.rect(x, y, width, height, "f");
+
+  if (flag === "no") {
+    drawPdfCross(page, x, y, width, height, "#ffffff", width * 0.24, height * 0.24);
+    drawPdfCross(page, x, y, width, height, "#00205b", width * 0.12, height * 0.12);
+  } else {
+    drawPdfCross(page, x, y, width, height, isSweden ? "#fecc00" : "#ffffff", width * 0.16, height * 0.16);
+  }
+}
+
+function drawPdfCross(page, x, y, width, height, color, verticalWidth, horizontalHeight) {
+  page.fill(color);
+  page.rect(x + width * 0.34, y, verticalWidth, height, "f");
+  page.rect(x, y + height * 0.42, width, horizontalHeight, "f");
+}
+
+async function loadPdfImage(source) {
+  if (!source) return null;
+  try {
+    const dataUrl = source.startsWith("data:") ? source : await fetchImageAsDataUrl(source);
+    if (!dataUrl.startsWith("data:image/jpeg")) return null;
+    const bytes = base64ToBinary(dataUrl.split(",")[1]);
+    const size = getJpegSize(bytes);
+    return size ? { bytes, ...size } : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function fetchImageAsDataUrl(source) {
+  const response = await fetch(source);
+  if (!response.ok) throw new Error("Image request failed");
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(reader.result));
+    reader.addEventListener("error", reject);
+    reader.readAsDataURL(blob);
+  });
+}
+
+function buildPdfFileName(months, paperSize) {
+  const start = toMonthKey(months[0]);
+  const end = toMonthKey(months[months.length - 1]);
+  return `calendar-${paperSize.label.toLowerCase()}-${start}${start === end ? "" : `-${end}`}.pdf`;
+}
+
 function renderPrintStack() {
   const key = [
     printStartInput.value,
     printEndInput.value,
+    paperSizeInput.value,
     photoVersion,
     titleInput.value,
     photoHeightInput.value,
+    calendarFontSizeInput.value,
+    calendarTextFontInput.value,
+    titleFontInput.value,
+    monthTitleFontInput.value,
+    calendarLabelFontInput.value,
     showWeekNumbersInput.checked,
     hideOutsideDaysInput.checked,
     showMemberColorsInput.checked,
@@ -1289,6 +1745,12 @@ function saveState() {
       title: titleInput.value,
       accent: accentInput.value,
       photoHeight: photoHeightInput.value,
+      calendarFontSize: calendarFontSizeInput.value,
+      calendarTextFont: calendarTextFontInput.value,
+      titleFont: titleFontInput.value,
+      monthTitleFont: monthTitleFontInput.value,
+      calendarLabelFont: calendarLabelFontInput.value,
+      paperSize: paperSizeInput.value,
       showWeekNumbers: showWeekNumbersInput.checked,
       hideOutsideDays: hideOutsideDaysInput.checked,
       showMemberColors: showMemberColorsInput.checked,
@@ -1339,6 +1801,17 @@ function loadSavedState() {
         saved.settings.title === "Family Calendar" ? "" : saved.settings.title || titleInput.value;
       accentInput.value = saved.settings.accent || accentInput.value;
       photoHeightInput.value = saved.settings.photoHeight || photoHeightInput.value;
+      calendarFontSizeInput.value =
+        saved.settings.calendarFontSize || calendarFontSizeInput.value;
+      calendarTextFontInput.value =
+        saved.settings.calendarTextFont || calendarTextFontInput.value;
+      titleFontInput.value = saved.settings.titleFont || titleFontInput.value;
+      monthTitleFontInput.value = saved.settings.monthTitleFont || monthTitleFontInput.value;
+      calendarLabelFontInput.value =
+        saved.settings.calendarLabelFont || calendarLabelFontInput.value;
+      paperSizeInput.value = paperSizes[saved.settings.paperSize]
+        ? saved.settings.paperSize
+        : paperSizeInput.value;
       showWeekNumbersInput.checked = saved.settings.showWeekNumbers ?? showWeekNumbersInput.checked;
       hideOutsideDaysInput.checked = saved.settings.hideOutsideDays ?? hideOutsideDaysInput.checked;
       showMemberColorsInput.checked =
@@ -1357,4 +1830,200 @@ function loadSavedState() {
       return;
     }
   }
+}
+
+class PdfDocument {
+  constructor(pageWidth, pageHeight) {
+    this.pageWidth = pageWidth;
+    this.pageHeight = pageHeight;
+    this.objects = [
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "",
+      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>",
+    ];
+    this.pages = [];
+    this.images = new Map();
+  }
+
+  addPage() {
+    const page = new PdfPage(this, this.pageWidth, this.pageHeight);
+    this.pages.push(page);
+    return page;
+  }
+
+  addImage(image) {
+    const key = hashBinary(image.bytes);
+    if (this.images.has(key)) return this.images.get(key);
+    const objectNumber = this.objects.length + 1;
+    this.objects.push({
+      dict: `<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.bytes.length} >>`,
+      stream: image.bytes,
+    });
+    const name = `Im${this.images.size + 1}`;
+    const entry = { name, objectNumber };
+    this.images.set(key, entry);
+    return entry;
+  }
+
+  toBlob() {
+    const kids = [];
+    this.pages.forEach((page) => {
+      const content = page.commands.join("\n");
+      const contentObject = this.objects.length + 1;
+      this.objects.push({
+        dict: `<< /Length ${content.length} >>`,
+        stream: content,
+      });
+
+      const imageResources = [...page.images]
+        .map((image) => `/${image.name} ${image.objectNumber} 0 R`)
+        .join(" ");
+      const resources = `<< /Font << /Helvetica 3 0 R /Helvetica-Bold 4 0 R >>${
+        imageResources ? ` /XObject << ${imageResources} >>` : ""
+      } >>`;
+      const pageObject = this.objects.length + 1;
+      this.objects.push(
+        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${this.pageWidth.toFixed(2)} ${this.pageHeight.toFixed(
+          2,
+        )}] /Resources ${resources} /Contents ${contentObject} 0 R >>`,
+      );
+      kids.push(`${pageObject} 0 R`);
+    });
+
+    this.objects[1] = `<< /Type /Pages /Kids [${kids.join(" ")}] /Count ${kids.length} >>`;
+
+    let pdf = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
+    const offsets = [0];
+    this.objects.forEach((object, index) => {
+      offsets.push(pdf.length);
+      pdf += `${index + 1} 0 obj\n`;
+      if (typeof object === "string") {
+        pdf += `${object}\n`;
+      } else {
+        pdf += `${object.dict}\nstream\n${object.stream}\nendstream\n`;
+      }
+      pdf += "endobj\n";
+    });
+    const xrefOffset = pdf.length;
+    pdf += `xref\n0 ${this.objects.length + 1}\n0000000000 65535 f \n`;
+    offsets.slice(1).forEach((offset) => {
+      pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+    });
+    pdf += `trailer\n<< /Size ${this.objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+    return new Blob([binaryToBytes(pdf)], { type: "application/pdf" });
+  }
+}
+
+class PdfPage {
+  constructor(document, width, height) {
+    this.document = document;
+    this.width = width;
+    this.height = height;
+    this.commands = [];
+    this.images = new Set();
+  }
+
+  fill(color) {
+    this.commands.push(`${rgb(color)} rg`);
+  }
+
+  stroke(color) {
+    this.commands.push(`${rgb(color)} RG`);
+  }
+
+  lineWidth(width) {
+    this.commands.push(`${fmt(width)} w`);
+  }
+
+  rect(x, y, width, height, mode) {
+    this.commands.push(`${fmt(x)} ${fmt(this.height - y - height)} ${fmt(width)} ${fmt(height)} re ${mode}`);
+  }
+
+  text(text, x, y, size, font) {
+    const fontName = font === "Helvetica-Bold" ? "Helvetica-Bold" : "Helvetica";
+    this.commands.push(
+      `BT /${fontName} ${fmt(size)} Tf ${fmt(x)} ${fmt(this.height - y)} Td (${escapePdfText(text)}) Tj ET`,
+    );
+  }
+
+  imageCover(image, x, y, width, height) {
+    const pdfImage = this.document.addImage(image);
+    this.images.add(pdfImage);
+    const scale = Math.max(width / image.width, height / image.height);
+    const drawWidth = image.width * scale;
+    const drawHeight = image.height * scale;
+    const drawX = x + (width - drawWidth) / 2;
+    const drawY = y + (height - drawHeight) / 2;
+    this.commands.push("q");
+    this.commands.push(`${fmt(x)} ${fmt(this.height - y - height)} ${fmt(width)} ${fmt(height)} re W n`);
+    this.commands.push(
+      `${fmt(drawWidth)} 0 0 ${fmt(drawHeight)} ${fmt(drawX)} ${fmt(this.height - drawY - drawHeight)} cm /${
+        pdfImage.name
+      } Do`,
+    );
+    this.commands.push("Q");
+  }
+}
+
+function mmToPt(mm) {
+  return (mm * 72) / 25.4;
+}
+
+function fmt(value) {
+  return Number(value).toFixed(2).replace(/\.?0+$/, "");
+}
+
+function rgb(color) {
+  const normalized = color.startsWith("#") ? color.slice(1) : color;
+  const red = parseInt(normalized.slice(0, 2), 16) / 255;
+  const green = parseInt(normalized.slice(2, 4), 16) / 255;
+  const blue = parseInt(normalized.slice(4, 6), 16) / 255;
+  return `${fmt(red)} ${fmt(green)} ${fmt(blue)}`;
+}
+
+function escapePdfText(text) {
+  return String(text)
+    .replace(/[^\x20-\x7e]/g, "?")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
+}
+
+function base64ToBinary(base64) {
+  return atob(base64);
+}
+
+function binaryToBytes(binary) {
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index) & 0xff;
+  }
+  return bytes;
+}
+
+function hashBinary(binary) {
+  let hash = 2166136261;
+  for (let index = 0; index < binary.length; index += 1) {
+    hash ^= binary.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${binary.length}:${hash >>> 0}`;
+}
+
+function getJpegSize(bytes) {
+  let offset = 2;
+  while (offset < bytes.length) {
+    if (bytes.charCodeAt(offset) !== 0xff) return null;
+    const marker = bytes.charCodeAt(offset + 1);
+    const length = (bytes.charCodeAt(offset + 2) << 8) + bytes.charCodeAt(offset + 3);
+    if (marker >= 0xc0 && marker <= 0xc3) {
+      return {
+        height: (bytes.charCodeAt(offset + 5) << 8) + bytes.charCodeAt(offset + 6),
+        width: (bytes.charCodeAt(offset + 7) << 8) + bytes.charCodeAt(offset + 8),
+      };
+    }
+    offset += 2 + length;
+  }
+  return null;
 }

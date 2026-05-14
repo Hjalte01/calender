@@ -45,6 +45,15 @@
               <input id="printEndInput" type="month" />
             </label>
           </div>
+          <label>
+            Paper size
+            <select id="paperSizeInput">
+              <option value="a3">A3</option>
+              <option value="a4" selected>A4</option>
+              <option value="a5">A5</option>
+            </select>
+          </label>
+          <button id="downloadPdfButton" type="button">Download PDF</button>
           <button id="printButton" type="button">Print</button>
         </div>
 
@@ -56,14 +65,37 @@
           </label>
           <label>
             Photo height
-            <input id="photoHeightInput" type="range" min="22" max="42" value="32" />
+            <input id="photoHeightInput" type="number" min="0" max="100" value="50" />
           </label>
+          <label>
+            Overall font size
+            <input id="calendarFontSizeInput" type="number" min="75" max="130" value="100" />
+          </label>
+          <button id="advancedFontButton" type="button" aria-expanded="false">Advanced fonts</button>
+          <div id="advancedFontControls" class="advanced-font is-hidden">
+            <label>
+              Calendar text
+              <input id="calendarTextFontInput" type="number" min="60" max="160" value="100" />
+            </label>
+            <label>
+              Title
+              <input id="titleFontInput" type="number" min="60" max="160" value="100" />
+            </label>
+            <label>
+              Month title
+              <input id="monthTitleFontInput" type="number" min="60" max="160" value="100" />
+            </label>
+            <label>
+              Days and weeks
+              <input id="calendarLabelFontInput" type="number" min="60" max="160" value="100" />
+            </label>
+          </div>
           <label class="checkbox-row">
             <input id="showWeekNumbersInput" type="checkbox" checked />
             Show week numbers
           </label>
           <label class="checkbox-row">
-            <input id="hideOutsideDaysInput" type="checkbox" />
+            <input id="hideOutsideDaysInput" type="checkbox" checked />
             Hide other months
           </label>
           <label class="checkbox-row">
@@ -74,6 +106,7 @@
             <input id="showPhotoAccentInput" type="checkbox" checked />
             Show photo accent line
           </label>
+          <button id="resetStyleButton" type="button">Reset style</button>
         </div>
 
         <div class="control-group is-hidden" data-panel="family">
@@ -150,22 +183,24 @@
 
       <button id="imageDrawerButton" class="drawer-toggle" type="button" aria-pressed="false" aria-label="Open images">☰</button>
 
-      <section class="sheet" aria-label="Printable calendar preview">
-        <header class="photo-panel" role="button" tabindex="0" aria-label="Choose photo for this month">
-          <img id="photoPreview" alt="" />
-          <div id="photoPlaceholder" class="photo-placeholder">Choose a photo</div>
-          <div class="calendar-title">
-            <span id="titlePreview"></span>
-            <strong id="monthPreview"></strong>
+      <div id="previewPane" class="preview-pane" aria-label="Printable calendar preview">
+        <section class="sheet">
+          <header class="photo-panel" role="button" tabindex="0" aria-label="Choose photo for this month">
+            <img id="photoPreview" alt="" />
+            <div id="photoPlaceholder" class="photo-placeholder">Choose a photo</div>
+            <div class="calendar-title">
+              <span id="titlePreview"></span>
+              <strong id="monthPreview"></strong>
+            </div>
+          </header>
+
+          <div class="calendar-wrap">
+            <div id="calendarGrid" class="calendar-grid"></div>
           </div>
-        </header>
 
-        <div class="calendar-wrap">
-          <div id="calendarGrid" class="calendar-grid"></div>
-        </div>
-
-        <div id="yearOverview" class="year-overview"></div>
-      </section>
+          <div id="yearOverview" class="year-overview"></div>
+        </section>
+      </div>
 
       <aside id="imageDrawer" class="image-drawer" aria-label="Image drawer">
         <div class="drawer-header">
