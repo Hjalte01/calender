@@ -11,16 +11,20 @@
       <aside class="controls" aria-label="Calendar controls">
         <div class="control-group">
           <h1>Calendar Builder</h1>
-          <label>
-            Month
-            <input id="monthInput" type="month" />
-          </label>
+          <div class="month-row">
+            <button id="previousMonthButton" class="icon-button" type="button" aria-label="Previous month">‹</button>
+            <label>
+              Month
+              <input id="monthInput" type="month" />
+            </label>
+            <button id="nextMonthButton" class="icon-button" type="button" aria-label="Next month">›</button>
+          </div>
           <label>
             Title
             <input id="titleInput" type="text" value="Family Calendar" />
           </label>
           <label>
-            Photo
+            Photo for this month
             <input id="photoInput" type="file" accept="image/*" />
           </label>
         </div>

@@ -1,7 +1,7 @@
 const state = {
   events: [],
   members: [],
-  photoUrl: "",
+  photos: {},
 };
 
 const STORAGE_KEY = "photo-calendar-state-v1";
@@ -12,6 +12,8 @@ const flagOptions = [
 ];
 
 const monthInput = document.querySelector("#monthInput");
+const previousMonthButton = document.querySelector("#previousMonthButton");
+const nextMonthButton = document.querySelector("#nextMonthButton");
 const titleInput = document.querySelector("#titleInput");
 const photoInput = document.querySelector("#photoInput");
 const accentInput = document.querySelector("#accentInput");
@@ -59,6 +61,8 @@ function init() {
   loadSavedState();
 
   monthInput.addEventListener("change", renderAndSave);
+  previousMonthButton.addEventListener("click", () => moveMonth(-1));
+  nextMonthButton.addEventListener("click", () => moveMonth(1));
   titleInput.addEventListener("input", renderAndSave);
   accentInput.addEventListener("input", renderAndSave);
   photoHeightInput.addEventListener("input", renderAndSave);
@@ -102,9 +106,13 @@ function handlePhoto(event) {
   const file = event.target.files?.[0];
   if (!file) return;
 
-  if (state.photoUrl) URL.revokeObjectURL(state.photoUrl);
-  state.photoUrl = URL.createObjectURL(file);
-  render();
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    state.photos[monthInput.value] = reader.result;
+    photoInput.value = "";
+    renderAndSave();
+  });
+  reader.readAsDataURL(file);
 }
 
 function addTypedEvent() {
@@ -312,8 +320,9 @@ function render() {
   document.documentElement.style.setProperty("--photo-height", `${photoHeightInput.value}%`);
 
   titlePreview.textContent = titleInput.value || "Calendar";
-  photoPreview.src = state.photoUrl;
-  photoPanel.classList.toggle("has-photo", Boolean(state.photoUrl));
+  const photo = getCurrentPhoto();
+  photoPreview.src = photo;
+  photoPanel.classList.toggle("has-photo", Boolean(photo));
 
   const selectedMonth = getSelectedMonth();
   monthPreview.textContent = monthFormatter.format(selectedMonth);
@@ -328,9 +337,22 @@ function renderAndSave() {
   saveState();
 }
 
+function moveMonth(offset) {
+  const selectedMonth = getSelectedMonth();
+  selectedMonth.setMonth(selectedMonth.getMonth() + offset);
+  monthInput.value = `${selectedMonth.getFullYear()}-${String(
+    selectedMonth.getMonth() + 1,
+  ).padStart(2, "0")}`;
+  renderAndSave();
+}
+
 function getSelectedMonth() {
   const [year, month] = monthInput.value.split("-").map(Number);
   return new Date(year, month - 1, 1);
+}
+
+function getCurrentPhoto() {
+  return state.photos[monthInput.value] || "";
 }
 
 function renderCalendar(monthDate) {
@@ -563,6 +585,7 @@ function saveState() {
   const saved = {
     events: state.events,
     members: state.members,
+    photos: state.photos,
     settings: {
       month: monthInput.value,
       title: titleInput.value,
@@ -595,6 +618,7 @@ function loadSavedState() {
     const saved = JSON.parse(raw);
     state.events = Array.isArray(saved.events) ? saved.events : [];
     state.members = Array.isArray(saved.members) ? saved.members : [];
+    state.photos = saved.photos && typeof saved.photos === "object" ? saved.photos : {};
 
     if (saved.settings) {
       monthInput.value = saved.settings.month || monthInput.value;

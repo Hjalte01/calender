@@ -21,7 +21,8 @@ http://localhost:8000
 ## Current Features
 
 - One month per A4 page.
-- Upload a photo for the top of the page.
+- Navigate months with previous/next controls.
+- Upload a separate photo for each month.
 - Change title, accent color, photo height, and week numbers.
 - Optionally hide dates from previous and next months.
 - Add family members and color-code their events.
