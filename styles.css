@@ -364,7 +364,7 @@ button + button {
 
 .image-actions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
   gap: 8px;
 }
 
@@ -493,6 +493,7 @@ button + button {
 
 .year-month {
   box-sizing: content-box;
+  position: relative;
   display: block;
   width: calc(210mm * var(--year-preview-scale));
   height: calc(297mm * var(--year-preview-scale));
@@ -522,7 +523,8 @@ button + button {
 }
 
 .photo-panel.is-assign-target::after,
-.year-preview-photo.is-assign-target::after {
+.year-preview-photo.is-assign-target::after,
+.year-month.is-assign-target::after {
   content: "+";
   position: absolute;
   inset: 0;
@@ -533,6 +535,10 @@ button + button {
   font-size: clamp(2rem, 8vw, 5rem);
   font-weight: 800;
   text-shadow: 0 2px 8px rgb(0 0 0 / 60%);
+}
+
+.year-month.is-assign-target::after {
+  z-index: 1;
 }
 
 .weekday,
