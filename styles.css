@@ -35,6 +35,10 @@ textarea {
   padding: 24px;
 }
 
+.app.has-image-drawer {
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr) minmax(260px, 320px);
+}
+
 .controls {
   display: flex;
   flex-direction: column;
@@ -53,6 +57,30 @@ textarea {
 .control-group {
   display: grid;
   gap: 12px;
+}
+
+.control-group.is-hidden,
+.image-drawer.is-hidden {
+  display: none;
+}
+
+.control-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.control-tab {
+  min-height: 34px;
+  padding: 6px 8px;
+  color: var(--ink);
+  background: #e4ded3;
+  font-size: 0.8rem;
+}
+
+.control-tab[aria-pressed="true"] {
+  color: #fff;
+  background: var(--accent);
 }
 
 .month-row {
@@ -168,7 +196,7 @@ input[type="range"] {
 
 .actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
 
@@ -244,6 +272,86 @@ button + button {
   padding: 4px 8px;
   color: var(--ink);
   background: #eee8de;
+}
+
+.image-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-self: start;
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid #d0c8ba;
+  border-radius: 8px;
+  background: #f8f4ec;
+}
+
+.drawer-header {
+  display: grid;
+  grid-template-columns: 1fr 34px;
+  gap: 8px;
+  align-items: center;
+}
+
+.drawer-header .icon-button {
+  min-height: 34px;
+  color: var(--ink);
+  background: #e4ded3;
+  font-size: 1.2rem;
+}
+
+.image-list {
+  display: grid;
+  gap: 10px;
+}
+
+.image-item {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #d7d0c4;
+  border-radius: 6px;
+  padding: 8px;
+  background: #fff;
+}
+
+.image-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 0;
+  border-radius: 4px;
+  padding: 0;
+  background: #ded6c9;
+}
+
+.image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  color: #3f4650;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.image-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.image-actions button {
+  min-height: 34px;
+  padding: 6px 8px;
 }
 
 .sheet {
@@ -558,6 +666,11 @@ button + button {
   }
 
   .controls {
+    position: static;
+    max-height: none;
+  }
+
+  .image-drawer {
     position: static;
     max-height: none;
   }

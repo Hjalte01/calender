@@ -4,6 +4,8 @@ const state = {
   photos: {},
   viewMode: "month",
   photoTargetMonth: "",
+  activePanel: "main",
+  imageDrawerOpen: false,
 };
 
 const STORAGE_KEY = "photo-calendar-state-v1";
@@ -14,12 +16,15 @@ const flagOptions = [
 ];
 
 const monthInput = document.querySelector("#monthInput");
+const app = document.querySelector("#app");
 const previousMonthButton = document.querySelector("#previousMonthButton");
 const nextMonthButton = document.querySelector("#nextMonthButton");
 const monthViewButton = document.querySelector("#monthViewButton");
 const yearViewButton = document.querySelector("#yearViewButton");
 const titleInput = document.querySelector("#titleInput");
 const photoInput = document.querySelector("#photoInput");
+const controlTabs = [...document.querySelectorAll(".control-tab")];
+const controlPanels = [...document.querySelectorAll("[data-panel]")];
 const accentInput = document.querySelector("#accentInput");
 const photoHeightInput = document.querySelector("#photoHeightInput");
 const showWeekNumbersInput = document.querySelector("#showWeekNumbersInput");
@@ -44,6 +49,10 @@ const importStatus = document.querySelector("#importStatus");
 const eventList = document.querySelector("#eventList");
 const printButton = document.querySelector("#printButton");
 const clearButton = document.querySelector("#clearButton");
+const imageDrawerButton = document.querySelector("#imageDrawerButton");
+const imageDrawer = document.querySelector("#imageDrawer");
+const closeImageDrawerButton = document.querySelector("#closeImageDrawerButton");
+const imageList = document.querySelector("#imageList");
 const photoPreview = document.querySelector("#photoPreview");
 const photoPanel = document.querySelector(".photo-panel");
 const titlePreview = document.querySelector("#titlePreview");
@@ -71,6 +80,9 @@ function init() {
   nextMonthButton.addEventListener("click", () => moveMonth(1));
   monthViewButton.addEventListener("click", () => setViewMode("month"));
   yearViewButton.addEventListener("click", () => setViewMode("year"));
+  controlTabs.forEach((tab) => {
+    tab.addEventListener("click", () => setActivePanel(tab.dataset.tab));
+  });
   titleInput.addEventListener("input", renderAndSave);
   accentInput.addEventListener("input", renderAndSave);
   photoHeightInput.addEventListener("input", renderAndSave);
@@ -90,6 +102,8 @@ function init() {
   addEventButton.addEventListener("click", addTypedEvent);
   importUrlButton.addEventListener("click", handleIcsUrlImport);
   icsInput.addEventListener("change", handleIcsImport);
+  imageDrawerButton.addEventListener("click", () => toggleImageDrawer());
+  closeImageDrawerButton.addEventListener("click", () => toggleImageDrawer(false));
   printButton.addEventListener("click", () => window.print());
   clearButton.addEventListener("click", () => {
     state.events = [];
@@ -352,6 +366,8 @@ function render() {
   renderCalendar(selectedMonth);
   renderYearOverview(selectedMonth.getFullYear());
   renderViewMode();
+  renderControls();
+  renderImageDrawer();
   renderEventList();
   renderMembers();
 }
@@ -375,6 +391,16 @@ function setViewMode(viewMode) {
   renderAndSave();
 }
 
+function setActivePanel(panel) {
+  state.activePanel = panel;
+  renderAndSave();
+}
+
+function toggleImageDrawer(forceOpen = !state.imageDrawerOpen) {
+  state.imageDrawerOpen = forceOpen;
+  renderAndSave();
+}
+
 function getSelectedMonth() {
   const [year, month] = monthInput.value.split("-").map(Number);
   return new Date(year, month - 1, 1);
@@ -384,10 +410,104 @@ function getCurrentPhoto() {
   return state.photos[monthInput.value] || "";
 }
 
+function monthKeyToDate(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return new Date(year, month - 1, 1);
+}
+
 function renderViewMode() {
   sheet.classList.toggle("year-mode", state.viewMode === "year");
   monthViewButton.setAttribute("aria-pressed", String(state.viewMode === "month"));
   yearViewButton.setAttribute("aria-pressed", String(state.viewMode === "year"));
+}
+
+function renderControls() {
+  controlTabs.forEach((tab) => {
+    tab.setAttribute("aria-pressed", String(tab.dataset.tab === state.activePanel));
+  });
+  controlPanels.forEach((panel) => {
+    panel.classList.toggle("is-hidden", panel.dataset.panel !== state.activePanel);
+  });
+}
+
+function renderImageDrawer() {
+  app.classList.toggle("has-image-drawer", state.imageDrawerOpen);
+  imageDrawer.classList.toggle("is-hidden", !state.imageDrawerOpen);
+  imageDrawerButton.setAttribute("aria-pressed", String(state.imageDrawerOpen));
+  imageList.innerHTML = "";
+
+  const entries = Object.entries(state.photos).sort(([a], [b]) => a.localeCompare(b));
+  if (!entries.length) {
+    const empty = document.createElement("p");
+    empty.className = "hint";
+    empty.textContent = "No photos added yet.";
+    imageList.append(empty);
+    return;
+  }
+
+  entries.forEach(([monthKey, photo]) => {
+    imageList.append(renderImageItem(monthKey, photo));
+  });
+}
+
+function renderImageItem(monthKey, photo) {
+  const item = document.createElement("article");
+  item.className = "image-item";
+
+  const thumb = document.createElement("button");
+  thumb.type = "button";
+  thumb.className = "image-thumb";
+  thumb.addEventListener("click", () => {
+    monthInput.value = monthKey;
+    renderAndSave();
+  });
+
+  const image = document.createElement("img");
+  image.src = photo;
+  image.alt = "";
+  thumb.append(image);
+
+  const meta = document.createElement("div");
+  meta.className = "image-meta";
+  meta.textContent = monthFormatter.format(monthKeyToDate(monthKey));
+
+  const actions = document.createElement("div");
+  actions.className = "image-actions";
+
+  const assignButton = document.createElement("button");
+  assignButton.type = "button";
+  assignButton.textContent = "Assign";
+  assignButton.addEventListener("click", () => {
+    state.photos[monthInput.value] = photo;
+    renderAndSave();
+  });
+
+  const swapButton = document.createElement("button");
+  swapButton.type = "button";
+  swapButton.textContent = "Swap";
+  swapButton.addEventListener("click", () => {
+    const selectedMonth = monthInput.value;
+    const currentPhoto = state.photos[selectedMonth];
+    state.photos[selectedMonth] = photo;
+    if (currentPhoto) {
+      state.photos[monthKey] = currentPhoto;
+    } else {
+      delete state.photos[monthKey];
+    }
+    renderAndSave();
+  });
+
+  const removeButton = document.createElement("button");
+  removeButton.type = "button";
+  removeButton.textContent = "Remove";
+  removeButton.addEventListener("click", () => {
+    delete state.photos[monthKey];
+    renderAndSave();
+  });
+
+  actions.append(assignButton, swapButton, removeButton);
+  item.append(thumb, meta, actions);
+  return item;
 }
 
 function renderCalendar(monthDate) {
@@ -712,6 +832,8 @@ function saveState() {
       showMemberColors: showMemberColorsInput.checked,
       importRegex: importRegexInput.value,
       viewMode: state.viewMode,
+      activePanel: state.activePanel,
+      imageDrawerOpen: state.imageDrawerOpen,
     },
   };
 
@@ -749,6 +871,8 @@ function loadSavedState() {
         saved.settings.showMemberColors ?? showMemberColorsInput.checked;
       importRegexInput.value = saved.settings.importRegex || importRegexInput.value;
       state.viewMode = saved.settings.viewMode || state.viewMode;
+      state.activePanel = saved.settings.activePanel || state.activePanel;
+      state.imageDrawerOpen = saved.settings.imageDrawerOpen ?? state.imageDrawerOpen;
     }
   } catch (error) {
     try {
