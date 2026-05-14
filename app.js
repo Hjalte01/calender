@@ -503,17 +503,26 @@ function renderFlagOptions() {
 
 function buildCalendarDays(monthDate) {
   const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const last = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
   const startOffset = (first.getDay() + 6) % 7;
+  const endOffset = 6 - ((last.getDay() + 6) % 7);
   const start = new Date(first);
+  const end = new Date(last);
   start.setDate(first.getDate() - startOffset);
+  end.setDate(last.getDate() + endOffset);
 
-  return Array.from({ length: 6 }, (_, weekIndex) =>
-    Array.from({ length: 7 }, (_, dayIndex) => {
-      const date = new Date(start);
-      date.setDate(start.getDate() + weekIndex * 7 + dayIndex);
-      return date;
-    }),
-  );
+  const weeks = [];
+  for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 7)) {
+    weeks.push(
+      Array.from({ length: 7 }, (_, dayIndex) => {
+        const date = new Date(cursor);
+        date.setDate(cursor.getDate() + dayIndex);
+        return date;
+      }),
+    );
+  }
+
+  return weeks;
 }
 
 function getIsoWeek(date) {
