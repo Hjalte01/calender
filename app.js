@@ -21,6 +21,7 @@ const renderCache = {
   eventList: "",
   members: "",
   monthPhoto: "",
+  print: "",
   view: "",
   year: "",
 };
@@ -35,6 +36,8 @@ const monthViewButton = document.querySelector("#monthViewButton");
 const yearViewButton = document.querySelector("#yearViewButton");
 const titleInput = document.querySelector("#titleInput");
 const photoInput = document.querySelector("#photoInput");
+const printStartInput = document.querySelector("#printStartInput");
+const printEndInput = document.querySelector("#printEndInput");
 const controlTabs = [...document.querySelectorAll(".control-tab")];
 const controlPanels = [...document.querySelectorAll("[data-panel]")];
 const accentInput = document.querySelector("#accentInput");
@@ -74,6 +77,7 @@ const monthPreview = document.querySelector("#monthPreview");
 const calendarGrid = document.querySelector("#calendarGrid");
 const sheet = document.querySelector(".sheet");
 const yearOverview = document.querySelector("#yearOverview");
+const printStack = document.querySelector("#printStack");
 
 const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const monthFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -86,6 +90,8 @@ init();
 function init() {
   const now = new Date();
   monthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  printStartInput.value = `${now.getFullYear()}-01`;
+  printEndInput.value = `${now.getFullYear()}-12`;
   renderFlagOptions();
   loadSavedState();
 
@@ -98,6 +104,8 @@ function init() {
     tab.addEventListener("click", () => setActivePanel(tab.dataset.tab));
   });
   titleInput.addEventListener("input", renderAndSave);
+  printStartInput.addEventListener("change", renderAndSave);
+  printEndInput.addEventListener("change", renderAndSave);
   accentInput.addEventListener("input", renderAndSave);
   photoHeightInput.addEventListener("input", renderAndSave);
   showWeekNumbersInput.addEventListener("change", renderAndSave);
@@ -120,7 +128,8 @@ function init() {
   closeImageDrawerButton.addEventListener("click", () => toggleImageDrawer(false));
   bulkPhotoInput.addEventListener("change", handleBulkPhotos);
   autoAssignImagesButton.addEventListener("click", autoAssignImages);
-  printButton.addEventListener("click", () => window.print());
+  printButton.addEventListener("click", printCalendar);
+  window.addEventListener("beforeprint", renderPrintStack);
   clearButton.addEventListener("click", () => {
     state.events = [];
     renderAndSave();
@@ -481,6 +490,89 @@ function renderAndSave() {
   scheduleSave();
 }
 
+function printCalendar() {
+  renderPrintStack();
+  saveState();
+  window.print();
+}
+
+function renderPrintStack() {
+  const key = [
+    printStartInput.value,
+    printEndInput.value,
+    photoVersion,
+    titleInput.value,
+    photoHeightInput.value,
+    showWeekNumbersInput.checked,
+    hideOutsideDaysInput.checked,
+    showMemberColorsInput.checked,
+    getEventsSignature(),
+    getMembersSignature(),
+  ].join("|");
+  if (renderCache.print === key) return;
+  renderCache.print = key;
+
+  printStack.innerHTML = "";
+  buildPrintMonths().forEach((monthDate) => {
+    printStack.append(renderPrintMonth(monthDate));
+  });
+}
+
+function buildPrintMonths() {
+  const start = monthKeyToDate(printStartInput.value || monthInput.value);
+  const end = monthKeyToDate(printEndInput.value || monthInput.value);
+  if (start > end) return [getSelectedMonth()];
+
+  const months = [];
+  for (let cursor = new Date(start); cursor <= end; cursor.setMonth(cursor.getMonth() + 1)) {
+    months.push(new Date(cursor));
+  }
+  return months;
+}
+
+function renderPrintMonth(monthDate) {
+  const page = document.createElement("section");
+  page.className = "print-page";
+
+  const monthKey = toMonthKey(monthDate);
+  const photo = state.photos[monthKey] || "";
+  const header = document.createElement("header");
+  header.className = "print-photo-panel";
+  header.classList.toggle("has-photo", Boolean(photo));
+
+  if (photo) {
+    const image = document.createElement("img");
+    image.src = photo;
+    image.alt = "";
+    header.append(image);
+  } else {
+    const placeholder = document.createElement("div");
+    placeholder.className = "photo-placeholder";
+    placeholder.textContent = "Choose a photo";
+    header.append(placeholder);
+  }
+
+  const title = document.createElement("div");
+  title.className = "calendar-title";
+  const titleText = document.createElement("span");
+  titleText.textContent = titleInput.value;
+  const monthText = document.createElement("strong");
+  monthText.textContent = monthFormatter.format(monthDate);
+  title.append(titleText, monthText);
+  header.append(title);
+
+  const wrap = document.createElement("div");
+  wrap.className = "calendar-wrap";
+  const grid = document.createElement("div");
+  grid.className = "calendar-grid";
+  grid.classList.toggle("no-weeks", !showWeekNumbersInput.checked);
+  renderCalendarGrid(monthDate, grid);
+  wrap.append(grid);
+
+  page.append(header, wrap);
+  return page;
+}
+
 function moveMonth(offset) {
   const selectedMonth = getSelectedMonth();
   selectedMonth.setMonth(selectedMonth.getMonth() + offset);
@@ -696,19 +788,22 @@ function renderCalendar(monthDate) {
 
   calendarGrid.innerHTML = "";
   calendarGrid.classList.toggle("no-weeks", !showWeekNumbersInput.checked);
+  renderCalendarGrid(monthDate, calendarGrid);
+}
 
+function renderCalendarGrid(monthDate, targetGrid) {
   if (showWeekNumbersInput.checked) {
-    calendarGrid.append(createCell("weekday", ""));
+    targetGrid.append(createCell("weekday", ""));
   }
-  weekdays.forEach((day) => calendarGrid.append(createCell("weekday", day)));
+  weekdays.forEach((day) => targetGrid.append(createCell("weekday", day)));
 
   buildCalendarDays(monthDate).forEach((week) => {
     if (showWeekNumbersInput.checked) {
-      calendarGrid.append(createCell("week-number", getIsoWeek(week[0])));
+      targetGrid.append(createCell("week-number", getIsoWeek(week[0])));
     }
 
     week.forEach((date) => {
-      calendarGrid.append(renderDay(date, monthDate));
+      targetGrid.append(renderDay(date, monthDate));
     });
   });
 }
@@ -1028,6 +1123,8 @@ function saveState() {
     photos: state.photos,
     settings: {
       month: monthInput.value,
+      printStart: printStartInput.value,
+      printEnd: printEndInput.value,
       title: titleInput.value,
       accent: accentInput.value,
       photoHeight: photoHeightInput.value,
@@ -1070,6 +1167,8 @@ function loadSavedState() {
 
     if (saved.settings) {
       monthInput.value = saved.settings.month || monthInput.value;
+      printStartInput.value = saved.settings.printStart || printStartInput.value;
+      printEndInput.value = saved.settings.printEnd || printEndInput.value;
       titleInput.value =
         saved.settings.title === "Family Calendar" ? "" : saved.settings.title || titleInput.value;
       accentInput.value = saved.settings.accent || accentInput.value;

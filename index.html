@@ -38,6 +38,16 @@
             Photo for this month
             <input id="photoInput" type="file" accept="image/*" />
           </label>
+          <div class="print-range">
+            <label>
+              Print from
+              <input id="printStartInput" type="month" />
+            </label>
+            <label>
+              Print to
+              <input id="printEndInput" type="month" />
+            </label>
+          </div>
           <button id="printButton" type="button">Print</button>
         </div>
 
@@ -170,6 +180,8 @@
         <div id="imageList" class="image-list"></div>
       </aside>
     </main>
+
+    <section id="printStack" class="print-stack" aria-hidden="true"></section>
 
     <script src="app.js"></script>
   </body>
