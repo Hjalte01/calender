@@ -652,8 +652,13 @@ function renderYearMonth(monthDate) {
   const title = document.createElement("div");
   title.className = "year-month-title";
   title.textContent = monthFormatter.format(monthDate);
+  photo.append(title);
 
-  button.append(photo, title, renderMiniCalendar(monthDate));
+  const body = document.createElement("div");
+  body.className = "year-month-body";
+  body.append(renderMiniCalendar(monthDate));
+
+  button.append(photo, body);
   return button;
 }
 
