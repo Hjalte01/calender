@@ -55,11 +55,10 @@ textarea {
 }
 
 .drawer-toggle {
-  position: sticky;
+  position: fixed;
   top: 24px;
+  right: 24px;
   z-index: 3;
-  align-self: start;
-  justify-self: end;
   width: 42px;
   min-height: 42px;
   padding: 0;

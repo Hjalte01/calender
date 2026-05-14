@@ -92,15 +92,15 @@
           <div class="event-form">
             <label>
               Year
-              <input id="eventYearInput" type="number" min="1" max="9999" placeholder="2001" />
+              <input id="eventYearInput" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="2001" />
             </label>
             <label>
               Month
-              <input id="eventMonthInput" type="number" min="1" max="12" placeholder="5" />
+              <input id="eventMonthInput" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="5" />
             </label>
             <label>
               Day
-              <input id="eventDayInput" type="number" min="1" max="31" placeholder="13" />
+              <input id="eventDayInput" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="13" />
             </label>
             <label>
               Flag
@@ -131,9 +131,9 @@
             Import .ics
             <input id="icsInput" type="file" accept=".ics,text/calendar" />
           </label>
-          <button id="clearButton" type="button">Clear events</button>
           <p id="importStatus" class="hint" role="status"></p>
           <ul id="eventList" class="event-list"></ul>
+          <button id="clearButton" type="button">Clear events</button>
         </div>
       </aside>
 
