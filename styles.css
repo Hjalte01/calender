@@ -272,6 +272,13 @@ button + button {
   overflow: hidden;
   border-bottom: 7px solid var(--accent);
   background: #d9d1c4;
+  cursor: pointer;
+}
+
+.photo-panel:focus-visible,
+.year-photo:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
 }
 
 .photo-panel img {

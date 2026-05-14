@@ -3,6 +3,7 @@ const state = {
   members: [],
   photos: {},
   viewMode: "month",
+  photoTargetMonth: "",
 };
 
 const STORAGE_KEY = "photo-calendar-state-v1";
@@ -78,6 +79,13 @@ function init() {
   showMemberColorsInput.addEventListener("change", renderAndSave);
   importRegexInput.addEventListener("input", renderAndSave);
   photoInput.addEventListener("change", handlePhoto);
+  photoPanel.addEventListener("click", () => openPhotoPicker(monthInput.value));
+  photoPanel.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openPhotoPicker(monthInput.value);
+    }
+  });
   addMemberButton.addEventListener("click", addMember);
   addEventButton.addEventListener("click", addTypedEvent);
   importUrlButton.addEventListener("click", handleIcsUrlImport);
@@ -112,14 +120,21 @@ function addMember() {
 function handlePhoto(event) {
   const file = event.target.files?.[0];
   if (!file) return;
+  const targetMonth = state.photoTargetMonth || monthInput.value;
 
   const reader = new FileReader();
   reader.addEventListener("load", () => {
-    state.photos[monthInput.value] = reader.result;
+    state.photos[targetMonth] = reader.result;
+    state.photoTargetMonth = "";
     photoInput.value = "";
     renderAndSave();
   });
   reader.readAsDataURL(file);
+}
+
+function openPhotoPicker(monthKey) {
+  state.photoTargetMonth = monthKey;
+  photoInput.click();
 }
 
 function addTypedEvent() {
@@ -420,6 +435,24 @@ function renderYearMonth(monthDate) {
 
   const photo = document.createElement("div");
   photo.className = "year-photo";
+  photo.setAttribute("role", "button");
+  photo.setAttribute("tabindex", "0");
+  photo.setAttribute("aria-label", `Choose photo for ${monthFormatter.format(monthDate)}`);
+  photo.addEventListener("click", (event) => {
+    event.stopPropagation();
+    monthInput.value = monthKey;
+    openPhotoPicker(monthKey);
+    render();
+  });
+  photo.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      event.stopPropagation();
+      monthInput.value = monthKey;
+      openPhotoPicker(monthKey);
+      render();
+    }
+  });
   if (state.photos[monthKey]) {
     const image = document.createElement("img");
     image.src = state.photos[monthKey];
