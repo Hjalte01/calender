@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Printable Photo Calendar</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <aside class="controls" aria-label="Calendar controls">
+        <div class="control-group">
+          <h1>Calendar Builder</h1>
+          <label>
+            Month
+            <input id="monthInput" type="month" />
+          </label>
+          <label>
+            Title
+            <input id="titleInput" type="text" value="Family Calendar" />
+          </label>
+          <label>
+            Photo
+            <input id="photoInput" type="file" accept="image/*" />
+          </label>
+        </div>
+
+        <div class="control-group">
+          <h2>Style</h2>
+          <label>
+            Accent color
+            <input id="accentInput" type="color" value="#bd1f2d" />
+          </label>
+          <label>
+            Photo height
+            <input id="photoHeightInput" type="range" min="22" max="42" value="32" />
+          </label>
+          <label class="checkbox-row">
+            <input id="showWeekNumbersInput" type="checkbox" checked />
+            Show week numbers
+          </label>
+        </div>
+
+        <div class="control-group">
+          <h2>Events</h2>
+          <p class="hint">Use tokens like <code>/flag_dk</code>, <code>/flag_no</code>, or <code>/flag_se</code>.</p>
+          <label>
+            Add event
+            <textarea id="eventInput" rows="3" placeholder="2026-05-17 Grandma /flag_dk"></textarea>
+          </label>
+          <button id="addEventButton" type="button">Add event</button>
+          <label>
+            Import .ics
+            <input id="icsInput" type="file" accept=".ics,text/calendar" />
+          </label>
+          <ul id="eventList" class="event-list"></ul>
+        </div>
+
+        <div class="actions">
+          <button id="printButton" type="button">Print</button>
+          <button id="clearButton" type="button">Clear events</button>
+        </div>
+      </aside>
+
+      <section class="sheet" aria-label="Printable calendar preview">
+        <header class="photo-panel">
+          <img id="photoPreview" alt="" />
+          <div id="photoPlaceholder" class="photo-placeholder">Choose a photo</div>
+          <div class="calendar-title">
+            <span id="titlePreview">Family Calendar</span>
+            <strong id="monthPreview"></strong>
+          </div>
+        </header>
+
+        <div class="calendar-wrap">
+          <div id="calendarGrid" class="calendar-grid"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
