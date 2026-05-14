@@ -14,6 +14,18 @@ const flagOptions = [
   { value: "no", label: "/flag_no" },
   { value: "se", label: "/flag_se" },
 ];
+const renderCache = {
+  calendar: "",
+  controls: "",
+  drawer: "",
+  eventList: "",
+  members: "",
+  monthPhoto: "",
+  view: "",
+  year: "",
+};
+let saveTimer = null;
+let photoVersion = 0;
 
 const monthInput = document.querySelector("#monthInput");
 const app = document.querySelector("#app");
@@ -113,6 +125,11 @@ function init() {
     state.events = [];
     renderAndSave();
   });
+  window.addEventListener("beforeunload", () => {
+    if (saveTimer) {
+      saveState();
+    }
+  });
 
   render();
 }
@@ -135,19 +152,15 @@ function addMember() {
   renderAndSave();
 }
 
-function handlePhoto(event) {
+async function handlePhoto(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   const targetMonth = state.photoTargetMonth || monthInput.value;
 
-  const reader = new FileReader();
-  reader.addEventListener("load", () => {
-    state.photos[targetMonth] = reader.result;
-    state.photoTargetMonth = "";
-    photoInput.value = "";
-    renderAndSave();
-  });
-  reader.readAsDataURL(file);
+  setPhoto(targetMonth, await readFileAsDataUrl(file));
+  state.photoTargetMonth = "";
+  photoInput.value = "";
+  renderAndSave();
 }
 
 async function handleBulkPhotos(event) {
@@ -159,7 +172,7 @@ async function handleBulkPhotos(event) {
   images.forEach((image, index) => {
     const month = new Date(startDate);
     month.setMonth(startDate.getMonth() + index);
-    state.photos[toMonthKey(month)] = image;
+    setPhoto(toMonthKey(month), image);
   });
 
   bulkPhotoInput.value = "";
@@ -168,9 +181,29 @@ async function handleBulkPhotos(event) {
 
 function readFileAsDataUrl(file) {
   return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => resolve(reader.result));
-    reader.readAsDataURL(file);
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.addEventListener("load", () => {
+      const maxSize = 1800;
+      const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(objectUrl);
+      resolve(canvas.toDataURL("image/jpeg", 0.82));
+    });
+
+    image.addEventListener("error", () => {
+      URL.revokeObjectURL(objectUrl);
+      const reader = new FileReader();
+      reader.addEventListener("load", () => resolve(reader.result));
+      reader.readAsDataURL(file);
+    });
+
+    image.src = objectUrl;
   });
 }
 
@@ -182,7 +215,7 @@ function autoAssignImages() {
   photos.forEach((photo, index) => {
     const month = new Date(startDate);
     month.setMonth(startDate.getMonth() + index);
-    state.photos[toMonthKey(month)] = photo;
+    setPhoto(toMonthKey(month), photo);
   });
   renderAndSave();
 }
@@ -324,6 +357,28 @@ function eventKey(event) {
   return [datePart, event.text.toLowerCase(), event.flags.join(","), event.memberId].join("|");
 }
 
+function getEventsSignature() {
+  return state.events
+    .map((event) =>
+      [
+        event.id,
+        event.date,
+        event.text,
+        event.flags.join(","),
+        event.memberId,
+        event.birthYear,
+        event.recurring,
+      ].join(":"),
+    )
+    .join("|");
+}
+
+function getMembersSignature() {
+  return state.members
+    .map((member) => [member.id, member.name, member.color].join(":"))
+    .join("|");
+}
+
 function readIcsField(block, name) {
   const line = block.split(/\r?\n/).find((item) => item.startsWith(`${name}`));
   return line ? line.slice(line.indexOf(":") + 1).trim() : "";
@@ -396,26 +451,34 @@ function render() {
   document.documentElement.style.setProperty("--accent", accentInput.value);
   document.documentElement.style.setProperty("--photo-height", `${photoHeightInput.value}%`);
 
-  titlePreview.textContent = titleInput.value;
-  const photo = getCurrentPhoto();
-  photoPreview.src = photo;
-  photoPanel.classList.toggle("has-photo", Boolean(photo));
-
   const selectedMonth = getSelectedMonth();
-  monthPreview.textContent = monthFormatter.format(selectedMonth);
-
-  renderCalendar(selectedMonth);
-  renderYearOverview(selectedMonth.getFullYear());
+  renderMonthPhoto(selectedMonth);
   renderViewMode();
   renderControls();
-  renderImageDrawer();
-  renderEventList();
-  renderMembers();
+  if (state.viewMode === "month") {
+    renderCalendar(selectedMonth);
+  }
+  if (state.viewMode === "year") {
+    renderYearOverview(selectedMonth.getFullYear());
+  }
+  if (state.imageDrawerOpen) {
+    renderImageDrawer();
+  } else {
+    app.classList.remove("has-image-drawer");
+    imageDrawer.classList.add("is-hidden");
+    imageDrawerButton.setAttribute("aria-pressed", "false");
+  }
+  if (state.activePanel === "events") {
+    renderEventList();
+  }
+  if (state.activePanel === "family" || state.activePanel === "events") {
+    renderMembers();
+  }
 }
 
 function renderAndSave() {
   render();
-  saveState();
+  scheduleSave();
 }
 
 function moveMonth(offset) {
@@ -451,6 +514,18 @@ function getCurrentPhoto() {
   return state.photos[monthInput.value] || "";
 }
 
+function setPhoto(monthKey, photo) {
+  if (state.photos[monthKey] === photo) return;
+  state.photos[monthKey] = photo;
+  photoVersion += 1;
+}
+
+function removePhoto(monthKey) {
+  if (!(monthKey in state.photos)) return;
+  delete state.photos[monthKey];
+  photoVersion += 1;
+}
+
 function toMonthKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
@@ -472,12 +547,18 @@ function buildMonthOptions() {
 }
 
 function renderViewMode() {
+  const key = `${state.viewMode}|${monthInput.value}`;
+  if (renderCache.view === key) return;
+  renderCache.view = key;
   sheet.classList.toggle("year-mode", state.viewMode === "year");
   monthViewButton.setAttribute("aria-pressed", String(state.viewMode === "month"));
   yearViewButton.setAttribute("aria-pressed", String(state.viewMode === "year"));
 }
 
 function renderControls() {
+  const key = state.activePanel;
+  if (renderCache.controls === key) return;
+  renderCache.controls = key;
   controlTabs.forEach((tab) => {
     tab.setAttribute("aria-pressed", String(tab.dataset.tab === state.activePanel));
   });
@@ -486,7 +567,31 @@ function renderControls() {
   });
 }
 
+function renderMonthPhoto(selectedMonth) {
+  const monthLabel = monthFormatter.format(selectedMonth);
+  const photo = getCurrentPhoto();
+  const key = `${monthInput.value}|${titleInput.value}|${monthLabel}|${photoVersion}`;
+  if (renderCache.monthPhoto === key) return;
+  renderCache.monthPhoto = key;
+
+  titlePreview.textContent = titleInput.value;
+  if (photoPreview.dataset.currentSrc !== photo) {
+    if (photo) {
+      photoPreview.src = photo;
+    } else {
+      photoPreview.removeAttribute("src");
+    }
+    photoPreview.dataset.currentSrc = photo;
+  }
+  photoPanel.classList.toggle("has-photo", Boolean(photo));
+  monthPreview.textContent = monthLabel;
+}
+
 function renderImageDrawer() {
+  const key = `${state.imageDrawerOpen}|${monthInput.value}|${photoVersion}`;
+  if (renderCache.drawer === key) return;
+  renderCache.drawer = key;
+
   app.classList.toggle("has-image-drawer", state.imageDrawerOpen);
   imageDrawer.classList.toggle("is-hidden", !state.imageDrawerOpen);
   imageDrawerButton.setAttribute("aria-pressed", String(state.imageDrawerOpen));
@@ -531,9 +636,9 @@ function renderImageItem(monthKey, photo) {
   monthSelect.value = monthKey;
   buildMonthOptions().forEach((option) => monthSelect.append(option));
   monthSelect.addEventListener("change", () => {
-    state.photos[monthSelect.value] = photo;
+    setPhoto(monthSelect.value, photo);
     if (monthSelect.value !== monthKey) {
-      delete state.photos[monthKey];
+      removePhoto(monthKey);
     }
     renderAndSave();
   });
@@ -545,7 +650,7 @@ function renderImageItem(monthKey, photo) {
   assignButton.type = "button";
   assignButton.textContent = "Assign";
   assignButton.addEventListener("click", () => {
-    state.photos[monthInput.value] = photo;
+    setPhoto(monthInput.value, photo);
     renderAndSave();
   });
 
@@ -555,11 +660,11 @@ function renderImageItem(monthKey, photo) {
   swapButton.addEventListener("click", () => {
     const selectedMonth = monthInput.value;
     const currentPhoto = state.photos[selectedMonth];
-    state.photos[selectedMonth] = photo;
+    setPhoto(selectedMonth, photo);
     if (currentPhoto) {
-      state.photos[monthKey] = currentPhoto;
+      setPhoto(monthKey, currentPhoto);
     } else {
-      delete state.photos[monthKey];
+      removePhoto(monthKey);
     }
     renderAndSave();
   });
@@ -568,7 +673,7 @@ function renderImageItem(monthKey, photo) {
   removeButton.type = "button";
   removeButton.textContent = "Remove";
   removeButton.addEventListener("click", () => {
-    delete state.photos[monthKey];
+    removePhoto(monthKey);
     renderAndSave();
   });
 
@@ -578,6 +683,17 @@ function renderImageItem(monthKey, photo) {
 }
 
 function renderCalendar(monthDate) {
+  const key = [
+    monthInput.value,
+    showWeekNumbersInput.checked,
+    hideOutsideDaysInput.checked,
+    showMemberColorsInput.checked,
+    getEventsSignature(),
+    getMembersSignature(),
+  ].join("|");
+  if (renderCache.calendar === key) return;
+  renderCache.calendar = key;
+
   calendarGrid.innerHTML = "";
   calendarGrid.classList.toggle("no-weeks", !showWeekNumbersInput.checked);
 
@@ -598,6 +714,10 @@ function renderCalendar(monthDate) {
 }
 
 function renderYearOverview(year) {
+  const key = `${year}|${monthInput.value}|${photoVersion}`;
+  if (renderCache.year === key) return;
+  renderCache.year = key;
+
   yearOverview.innerHTML = "";
 
   Array.from({ length: 12 }, (_, index) => {
@@ -752,6 +872,10 @@ function formatEventText(event, displayYear) {
 }
 
 function renderEventList() {
+  const key = `${getEventsSignature()}|${getMembersSignature()}`;
+  if (renderCache.eventList === key) return;
+  renderCache.eventList = key;
+
   eventList.innerHTML = "";
   [...state.events]
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -776,6 +900,10 @@ function renderEventList() {
 }
 
 function renderMembers() {
+  const key = getMembersSignature();
+  if (renderCache.members === key) return;
+  renderCache.members = key;
+
   const selectedMember = eventMemberInput.value;
   eventMemberInput.innerHTML = '<option value="">Shared</option>';
   state.members.forEach((member) => {
@@ -890,6 +1018,10 @@ function normalizeCalendarUrl(url) {
 }
 
 function saveState() {
+  if (saveTimer) {
+    window.clearTimeout(saveTimer);
+  }
+  saveTimer = null;
   const saved = {
     events: state.events,
     members: state.members,
@@ -914,6 +1046,11 @@ function saveState() {
   } catch (error) {
     importStatus.textContent = "Browser storage is unavailable, so changes only last until refresh.";
   }
+}
+
+function scheduleSave() {
+  window.clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(saveState, 250);
 }
 
 function loadSavedState() {
