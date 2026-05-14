@@ -27,6 +27,8 @@ http://localhost:8000
 - Print a selected month range as one A4 page per month.
 - Manage photos from an image drawer with month images and extra images. Bulk-added photos fill empty months in the print range first; overflow goes to Extra.
 - Use `Use photo` in the drawer, then click a month photo area or year tile plus target to place it.
+- Add 12 sample photos from URL-backed placeholders for quick testing.
+- Toggle the photo accent line in Style.
 - Use top control tabs for Main, Style, Family, and Events instead of one long sidebar.
 - Change title, accent color, photo height, and week numbers.
 - Optionally hide dates from previous and next months.

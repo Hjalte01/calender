@@ -5,6 +5,8 @@
   --ink: #1f2328;
   --muted: #69707a;
   --line: #d8d2c7;
+  --photo-accent-width: 7px;
+  --year-photo-accent-width: 3px;
 }
 
 * {
@@ -301,17 +303,7 @@ button + button {
 }
 
 .drawer-header {
-  display: grid;
-  grid-template-columns: 1fr 34px;
-  gap: 8px;
-  align-items: center;
-}
-
-.drawer-header .icon-button {
-  min-height: 34px;
-  color: var(--ink);
-  background: #e4ded3;
-  font-size: 1.2rem;
+  display: block;
 }
 
 .drawer-tabs {
@@ -412,7 +404,7 @@ button + button {
   height: var(--photo-height);
   min-height: 180px;
   overflow: hidden;
-  border-bottom: 7px solid var(--accent);
+  border-bottom: var(--photo-accent-width) solid var(--accent);
   background: #d9d1c4;
   cursor: pointer;
 }
@@ -522,7 +514,7 @@ button + button {
   display: grid;
   place-items: center;
   overflow: hidden;
-  border-bottom: 3px solid var(--accent);
+  border-bottom: var(--year-photo-accent-width) solid var(--accent);
   border-radius: 0;
   background: #ded6c9;
   color: #69707a;
@@ -794,7 +786,7 @@ button + button {
     height: var(--photo-height);
     min-height: 180px;
     overflow: hidden;
-    border-bottom: 7px solid var(--accent);
+    border-bottom: var(--photo-accent-width) solid var(--accent);
     background: #d9d1c4;
   }
 

@@ -48,6 +48,7 @@ const photoHeightInput = document.querySelector("#photoHeightInput");
 const showWeekNumbersInput = document.querySelector("#showWeekNumbersInput");
 const hideOutsideDaysInput = document.querySelector("#hideOutsideDaysInput");
 const showMemberColorsInput = document.querySelector("#showMemberColorsInput");
+const showPhotoAccentInput = document.querySelector("#showPhotoAccentInput");
 const memberNameInput = document.querySelector("#memberNameInput");
 const memberColorInput = document.querySelector("#memberColorInput");
 const addMemberButton = document.querySelector("#addMemberButton");
@@ -69,10 +70,10 @@ const printButton = document.querySelector("#printButton");
 const clearButton = document.querySelector("#clearButton");
 const imageDrawerButton = document.querySelector("#imageDrawerButton");
 const imageDrawer = document.querySelector("#imageDrawer");
-const closeImageDrawerButton = document.querySelector("#closeImageDrawerButton");
 const bulkPhotoInput = document.querySelector("#bulkPhotoInput");
 const monthImagesTabButton = document.querySelector("#monthImagesTabButton");
 const extraImagesTabButton = document.querySelector("#extraImagesTabButton");
+const sampleImagesButton = document.querySelector("#sampleImagesButton");
 const imageList = document.querySelector("#imageList");
 const photoPreview = document.querySelector("#photoPreview");
 const photoPanel = document.querySelector(".photo-panel");
@@ -115,6 +116,7 @@ function init() {
   showWeekNumbersInput.addEventListener("change", renderAndSave);
   hideOutsideDaysInput.addEventListener("change", renderAndSave);
   showMemberColorsInput.addEventListener("change", renderAndSave);
+  showPhotoAccentInput.addEventListener("change", renderAndSave);
   importRegexInput.addEventListener("input", renderAndSave);
   photoInput.addEventListener("change", handlePhoto);
   photoPanel.addEventListener("click", () => {
@@ -135,10 +137,10 @@ function init() {
   importUrlButton.addEventListener("click", handleIcsUrlImport);
   icsInput.addEventListener("change", handleIcsImport);
   imageDrawerButton.addEventListener("click", () => toggleImageDrawer());
-  closeImageDrawerButton.addEventListener("click", () => toggleImageDrawer(false));
   bulkPhotoInput.addEventListener("change", handleBulkPhotos);
   monthImagesTabButton.addEventListener("click", () => setImageDrawerTab("images"));
   extraImagesTabButton.addEventListener("click", () => setImageDrawerTab("extra"));
+  sampleImagesButton.addEventListener("click", addSampleImages);
   printButton.addEventListener("click", printCalendar);
   window.addEventListener("beforeprint", renderPrintStack);
   clearButton.addEventListener("click", () => {
@@ -198,6 +200,22 @@ async function handleBulkPhotos(event) {
   if (!files.length) return;
 
   const images = await Promise.all(files.map(readFileAsDataUrl));
+  assignIncomingPhotos(images);
+
+  bulkPhotoInput.value = "";
+  renderAndSave();
+}
+
+async function addSampleImages() {
+  const images = Array.from({ length: 12 }, (_, index) => {
+    const seed = `${printStartInput.value || monthInput.value}-${index + 1}`;
+    return `https://picsum.photos/seed/${encodeURIComponent(seed)}/1800/1200`;
+  });
+  assignIncomingPhotos(images);
+  renderAndSave();
+}
+
+function assignIncomingPhotos(images) {
   const openMonths = buildPrintMonths()
     .map(toMonthKey)
     .filter((monthKey) => !state.photos[monthKey]);
@@ -209,9 +227,6 @@ async function handleBulkPhotos(event) {
       addExtraPhoto(image);
     }
   });
-
-  bulkPhotoInput.value = "";
-  renderAndSave();
 }
 
 function readFileAsDataUrl(file) {
@@ -472,6 +487,14 @@ function replaceYear(date, year) {
 function render() {
   document.documentElement.style.setProperty("--accent", accentInput.value);
   document.documentElement.style.setProperty("--photo-height", `${photoHeightInput.value}%`);
+  document.documentElement.style.setProperty(
+    "--photo-accent-width",
+    showPhotoAccentInput.checked ? "7px" : "0px",
+  );
+  document.documentElement.style.setProperty(
+    "--year-photo-accent-width",
+    showPhotoAccentInput.checked ? "3px" : "0px",
+  );
 
   const selectedMonth = getSelectedMonth();
   renderMonthPhoto(selectedMonth);
@@ -486,9 +509,7 @@ function render() {
   if (state.imageDrawerOpen) {
     renderImageDrawer();
   } else {
-    app.classList.remove("has-image-drawer");
-    imageDrawer.classList.add("is-hidden");
-    imageDrawerButton.setAttribute("aria-pressed", "false");
+    renderImageDrawer();
   }
   if (state.activePanel === "events") {
     renderEventList();
@@ -734,15 +755,17 @@ function renderMonthPhoto(selectedMonth) {
 }
 
 function renderImageDrawer() {
-  const key = `${state.imageDrawerOpen}|${state.imageDrawerTab}|${monthInput.value}|${photoVersion}`;
-  if (renderCache.drawer === key) return;
-  renderCache.drawer = key;
-
   app.classList.toggle("has-image-drawer", state.imageDrawerOpen);
   imageDrawer.classList.toggle("is-hidden", !state.imageDrawerOpen);
   imageDrawerButton.setAttribute("aria-pressed", String(state.imageDrawerOpen));
   monthImagesTabButton.setAttribute("aria-pressed", String(state.imageDrawerTab === "images"));
   extraImagesTabButton.setAttribute("aria-pressed", String(state.imageDrawerTab === "extra"));
+  if (!state.imageDrawerOpen) return;
+
+  const key = `${state.imageDrawerOpen}|${state.imageDrawerTab}|${monthInput.value}|${photoVersion}`;
+  if (renderCache.drawer === key) return;
+  renderCache.drawer = key;
+
   imageList.innerHTML = "";
 
   const entries =
@@ -1219,6 +1242,7 @@ function saveState() {
       showWeekNumbers: showWeekNumbersInput.checked,
       hideOutsideDays: hideOutsideDaysInput.checked,
       showMemberColors: showMemberColorsInput.checked,
+      showPhotoAccent: showPhotoAccentInput.checked,
       importRegex: importRegexInput.value,
       viewMode: state.viewMode,
       activePanel: state.activePanel,
@@ -1267,6 +1291,7 @@ function loadSavedState() {
       hideOutsideDaysInput.checked = saved.settings.hideOutsideDays ?? hideOutsideDaysInput.checked;
       showMemberColorsInput.checked =
         saved.settings.showMemberColors ?? showMemberColorsInput.checked;
+      showPhotoAccentInput.checked = saved.settings.showPhotoAccent ?? showPhotoAccentInput.checked;
       importRegexInput.value = saved.settings.importRegex || importRegexInput.value;
       state.viewMode = saved.settings.viewMode || state.viewMode;
       state.activePanel = saved.settings.activePanel || state.activePanel;
