@@ -1,6 +1,12 @@
+const DEFAULT_GENERAL_MEMBER = {
+  id: "general",
+  name: "General",
+  color: "#ffffff",
+};
+
 const state = {
   events: [],
-  members: [],
+  members: [{ ...DEFAULT_GENERAL_MEMBER }],
   photos: {},
   extraPhotos: [],
   viewMode: "month",
@@ -26,6 +32,9 @@ const styleDefaults = {
   showWeekNumbers: true,
   hideOutsideDays: true,
   showMemberColors: true,
+  showFamilyNames: true,
+  showFamilyNameColumn: true,
+  showFamilyBorders: false,
   showPhotoAccent: true,
 };
 const paperSizes = {
@@ -78,12 +87,16 @@ const paperSizeInput = document.querySelector("#paperSizeInput");
 const showWeekNumbersInput = document.querySelector("#showWeekNumbersInput");
 const hideOutsideDaysInput = document.querySelector("#hideOutsideDaysInput");
 const showMemberColorsInput = document.querySelector("#showMemberColorsInput");
+const showFamilyNamesInput = document.querySelector("#showFamilyNamesInput");
+const showFamilyNameColumnInput = document.querySelector("#showFamilyNameColumnInput");
+const showFamilyBordersInput = document.querySelector("#showFamilyBordersInput");
 const showPhotoAccentInput = document.querySelector("#showPhotoAccentInput");
 const resetStyleButton = document.querySelector("#resetStyleButton");
 const memberNameInput = document.querySelector("#memberNameInput");
 const memberColorInput = document.querySelector("#memberColorInput");
 const addMemberButton = document.querySelector("#addMemberButton");
 const memberList = document.querySelector("#memberList");
+const resetStorageButton = document.querySelector("#resetStorageButton");
 const eventMemberInput = document.querySelector("#eventMemberInput");
 const eventYearInput = document.querySelector("#eventYearInput");
 const eventMonthInput = document.querySelector("#eventMonthInput");
@@ -156,6 +169,9 @@ function init() {
   showWeekNumbersInput.addEventListener("change", renderAndSave);
   hideOutsideDaysInput.addEventListener("change", renderAndSave);
   showMemberColorsInput.addEventListener("change", renderAndSave);
+  showFamilyNamesInput.addEventListener("change", renderAndSave);
+  showFamilyNameColumnInput.addEventListener("change", renderAndSave);
+  showFamilyBordersInput.addEventListener("change", renderAndSave);
   showPhotoAccentInput.addEventListener("change", renderAndSave);
   resetStyleButton.addEventListener("click", resetStyleSettings);
   importRegexInput.addEventListener("input", renderAndSave);
@@ -170,6 +186,7 @@ function init() {
     }
   });
   addMemberButton.addEventListener("click", addMember);
+  resetStorageButton.addEventListener("click", resetSavedBrowserData);
   addEventButton.addEventListener("click", addTypedEvent);
   importUrlButton.addEventListener("click", handleIcsUrlImport);
   icsInput.addEventListener("change", handleIcsImport);
@@ -216,6 +233,21 @@ function addMember() {
   });
   memberNameInput.value = "";
   renderAndSave();
+}
+
+async function resetSavedBrowserData() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    sessionStorage.clear();
+    if ("caches" in window) {
+      await Promise.all((await caches.keys()).map((key) => caches.delete(key)));
+    }
+  } catch (error) {
+    importStatus.textContent = "Could not clear saved browser data.";
+    return;
+  }
+
+  window.location.reload();
 }
 
 async function handlePhoto(event) {
@@ -637,6 +669,9 @@ function resetStyleSettings() {
   showWeekNumbersInput.checked = styleDefaults.showWeekNumbers;
   hideOutsideDaysInput.checked = styleDefaults.hideOutsideDays;
   showMemberColorsInput.checked = styleDefaults.showMemberColors;
+  showFamilyNamesInput.checked = styleDefaults.showFamilyNames;
+  showFamilyNameColumnInput.checked = styleDefaults.showFamilyNameColumn;
+  showFamilyBordersInput.checked = styleDefaults.showFamilyBorders;
   showPhotoAccentInput.checked = styleDefaults.showPhotoAccent;
   renderAndSave();
 }
@@ -840,41 +875,59 @@ async function addCalendarPdfPage(pdf, monthDate, paperSize) {
 function drawPdfCalendarGrid(page, monthDate, box) {
   const weeks = buildCalendarDays(monthDate);
   const hasWeeks = showWeekNumbersInput.checked;
-  const columns = hasWeeks ? [0.45, 1, 1, 1, 1, 1, 1, 1] : [1, 1, 1, 1, 1, 1, 1];
+  const hasFamilySections = usesFamilyDaySections();
+  const hasFamilyNameColumn = usesFamilyNameColumn();
+  const headerHeightRatio = 0.22;
+  const leadingColumns = [
+    ...(hasWeeks ? [0.225] : []),
+    ...(hasFamilyNameColumn ? [0.275] : []),
+  ];
+  const columns = [...leadingColumns, 1, 1, 1, 1, 1, 1, 1];
   const totalColumns = columns.reduce((sum, value) => sum + value, 0);
-  const headerRows = 1;
-  const rowHeight = box.height / (weeks.length + headerRows);
+  const headerHeight = (box.height * headerHeightRatio) / (weeks.length + headerHeightRatio);
+  const rowHeight = (box.height - headerHeight) / weeks.length;
   const columnWidths = columns.map((value) => (box.width * value) / totalColumns);
   const columnX = columnWidths.reduce(
     (positions, width) => [...positions, positions[positions.length - 1] + width],
     [box.x],
   );
 
-  page.stroke("#d8d2c7");
+  page.stroke("#000000");
   page.lineWidth(0.75);
-  if (hasWeeks) {
-    drawPdfHeaderCell(page, "", columnX[0], box.y, columnWidths[0], rowHeight);
+  if (leadingColumns.length) {
+    const leadingWidth = columnWidths
+      .slice(0, leadingColumns.length)
+      .reduce((sum, width) => sum + width, 0);
+    drawPdfHeaderCell(page, "", columnX[0], box.y, leadingWidth, headerHeight);
   }
   weekdays.forEach((weekday, index) => {
-    const column = hasWeeks ? index + 1 : index;
-    drawPdfHeaderCell(page, weekday, columnX[column], box.y, columnWidths[column], rowHeight);
+    const column = leadingColumns.length + index;
+    drawPdfHeaderCell(page, weekday, columnX[column], box.y, columnWidths[column], headerHeight);
   });
 
   weeks.forEach((week, weekIndex) => {
-    const y = box.y + rowHeight * (weekIndex + headerRows);
+    const y = box.y + headerHeight + rowHeight * weekIndex;
     if (hasWeeks) {
-      drawPdfHeaderCell(page, String(getIsoWeek(week[0])), columnX[0], y, columnWidths[0], rowHeight);
+      drawPdfWeekCell(page, week[0], columnX[0], y, columnWidths[0], rowHeight);
+    }
+    if (hasFamilyNameColumn) {
+      const column = hasWeeks ? 1 : 0;
+      drawPdfFamilyLabelCell(page, columnX[column], y, columnWidths[column], rowHeight);
     }
 
     week.forEach((date, dayIndex) => {
       const outsideMonth = date.getMonth() !== monthDate.getMonth();
       const hidden = outsideMonth && hideOutsideDaysInput.checked;
-      const column = hasWeeks ? dayIndex + 1 : dayIndex;
+      const column = leadingColumns.length + dayIndex;
       const x = columnX[column];
       const width = columnWidths[column];
       page.fill(outsideMonth ? "#f7f2e9" : "#fffdf8");
       page.rect(x, y, width, rowHeight, "f");
-      page.stroke("#d8d2c7");
+      if (!hidden && usesFamilyDaySections()) {
+        drawPdfFamilyDaySections(page, date, x, y, width, rowHeight, outsideMonth);
+      }
+      page.lineWidth(0.75);
+      page.stroke("#000000");
       page.rect(x, y, width, rowHeight, "s");
       if (!hidden) {
         drawPdfDay(page, date, x, y, width, rowHeight, outsideMonth);
@@ -887,7 +940,7 @@ function drawPdfHeaderCell(page, text, x, y, width, height) {
   const fontScale = getFontScale("calendarLabel");
   page.fill("#f4efe5");
   page.rect(x, y, width, height, "f");
-  page.stroke("#d8d2c7");
+  page.stroke("#000000");
   page.rect(x, y, width, height, "s");
   page.fill("#69707a");
   page.text(
@@ -899,6 +952,16 @@ function drawPdfHeaderCell(page, text, x, y, width, height) {
   );
 }
 
+function drawPdfWeekCell(page, date, x, y, width, height) {
+  page.fill("#ffffff");
+  page.rect(x, y, width, height, "f");
+  page.lineWidth(0.75);
+  page.stroke("#000000");
+  page.rect(x, y, width, height, "s");
+  page.fill("#69707a");
+  page.text(String(getIsoWeek(date)), x + 4, y + 12, 7.2 * getFontScale("calendarLabel"), "Helvetica-Bold");
+}
+
 function drawPdfDay(page, date, x, y, width, height, outsideMonth) {
   const fontScale = getFontScale("calendarText");
   page.fill(outsideMonth ? "#9ea4aa" : "#1f2328");
@@ -907,7 +970,10 @@ function drawPdfDay(page, date, x, y, width, height, outsideMonth) {
   const events = state.events.filter((item) => eventOccursOn(item, date));
   let eventY = y + 23;
   const eventStep = 10 * fontScale;
-  events.slice(0, Math.max(1, Math.floor((height - 24) / eventStep))).forEach((event) => {
+  const visibleEvents = usesFamilyDaySections()
+    ? events.filter((event) => !getMember(event.memberId) && !getGeneralMember())
+    : events;
+  visibleEvents.slice(0, Math.max(1, Math.floor((height - 24) / eventStep))).forEach((event) => {
     const member = getMember(event.memberId);
     let textX = x + 5;
     if (member && showMemberColorsInput.checked) {
@@ -922,6 +988,77 @@ function drawPdfDay(page, date, x, y, width, height, outsideMonth) {
     page.text(formatEventText(event, date.getFullYear()), textX, eventY, 6.4 * fontScale, "Helvetica");
     eventY += eventStep;
   });
+}
+
+function drawPdfFamilyDaySections(page, date, x, y, width, height, outsideMonth) {
+  const fontScale = getFontScale("calendarText");
+  const sections = getFamilySections();
+  const sectionHeight = height / sections.length;
+  const sectionBorder = getFamilySectionBorderColor();
+  const events = state.events.filter((item) => eventOccursOn(item, date));
+
+  sections.forEach((section, index) => {
+    const sectionY = y + sectionHeight * index;
+    const fill = mixHexColors(section.color, outsideMonth ? "#f7f2e9" : "#ffffff", outsideMonth ? 0.34 : 0.48);
+    page.fill(fill);
+    page.rect(x, sectionY, width, sectionHeight, "f");
+    if (sectionBorder && index < sections.length - 1) {
+      page.fill(sectionBorder);
+      page.rect(x, sectionY + sectionHeight - 0.25, width, 0.5, "f");
+    }
+
+    let eventY = sectionY + (index === 0 ? 23 : 10);
+    const eventStep = 9 * fontScale;
+    const capacity = Math.max(1, Math.floor((sectionY + sectionHeight - eventY - 3) / eventStep) + 1);
+    events
+      .filter((event) => eventBelongsToFamilySection(event, section))
+      .slice(0, capacity)
+      .forEach((event) => {
+        let textX = x + 5;
+        event.flags.forEach((flag) => {
+          drawPdfFlag(page, flag, textX, eventY - 7, 10 * fontScale, 6.5 * fontScale);
+          textX += 12 * fontScale;
+        });
+        page.fill("#1f2328");
+        page.text(formatEventText(event, date.getFullYear()), textX, eventY, 6.4 * fontScale, "Helvetica");
+        eventY += eventStep;
+      });
+  });
+}
+
+function drawPdfFamilyLabelCell(page, x, y, width, height) {
+  const sections = getFamilySections();
+  const sectionHeight = height / sections.length;
+  const sectionBorder = getFamilySectionBorderColor();
+
+  sections.forEach((section, index) => {
+    const sectionY = y + sectionHeight * index;
+    const fill = mixHexColors(section.color, "#ffffff", 0.48);
+    page.fill(fill);
+    page.rect(x, sectionY, width, sectionHeight, "f");
+    if (sectionBorder && index < sections.length - 1) {
+      page.fill(sectionBorder);
+      page.rect(x, sectionY + sectionHeight - 0.25, width, 0.5, "f");
+    }
+    page.fill("#1f2328");
+    if (showFamilyNamesInput.checked) {
+      page.textRotated(
+        section.label.slice(0, 10),
+        x + width / 2 + 2,
+        sectionY + sectionHeight / 2 + 8,
+        4.8,
+        "Helvetica-Bold",
+      );
+    }
+  });
+
+  page.lineWidth(0.75);
+  page.stroke("#000000");
+  page.rect(x, y, width, height, "s");
+}
+
+function getFamilySectionBorderColor() {
+  return showFamilyBordersInput.checked ? "#000000" : "";
 }
 
 function getFontScale(section, includeOverall = true) {
@@ -1004,6 +1141,9 @@ function renderPrintStack() {
     showWeekNumbersInput.checked,
     hideOutsideDaysInput.checked,
     showMemberColorsInput.checked,
+    showFamilyNamesInput.checked,
+    showFamilyNameColumnInput.checked,
+    showFamilyBordersInput.checked,
     getEventsSignature(),
     getMembersSignature(),
   ].join("|");
@@ -1064,6 +1204,8 @@ function renderPrintMonth(monthDate) {
   const grid = document.createElement("div");
   grid.className = "calendar-grid";
   grid.classList.toggle("no-weeks", !showWeekNumbersInput.checked);
+  grid.classList.toggle("has-family-sections", usesFamilyDaySections());
+  grid.classList.toggle("has-family-name-column", usesFamilyNameColumn());
   renderCalendarGrid(monthDate, grid);
   wrap.append(grid);
 
@@ -1378,6 +1520,9 @@ function renderCalendar(monthDate) {
     showWeekNumbersInput.checked,
     hideOutsideDaysInput.checked,
     showMemberColorsInput.checked,
+    showFamilyNamesInput.checked,
+    showFamilyNameColumnInput.checked,
+    showFamilyBordersInput.checked,
     getEventsSignature(),
     getMembersSignature(),
   ].join("|");
@@ -1386,24 +1531,75 @@ function renderCalendar(monthDate) {
 
   calendarGrid.innerHTML = "";
   calendarGrid.classList.toggle("no-weeks", !showWeekNumbersInput.checked);
+  calendarGrid.classList.toggle("has-family-sections", usesFamilyDaySections());
+  calendarGrid.classList.toggle("has-family-name-column", usesFamilyNameColumn());
   renderCalendarGrid(monthDate, calendarGrid);
 }
 
 function renderCalendarGrid(monthDate, targetGrid) {
-  if (showWeekNumbersInput.checked) {
-    targetGrid.append(createCell("weekday", ""));
+  const hasWeeks = showWeekNumbersInput.checked;
+  const hasFamilySections = usesFamilyDaySections();
+  const hasFamilyNameColumn = usesFamilyNameColumn();
+  targetGrid.style.setProperty("--calendar-week-count", buildCalendarDays(monthDate).length);
+  targetGrid.classList.toggle("has-family-sections", hasFamilySections);
+  targetGrid.classList.toggle("has-family-name-column", hasFamilyNameColumn);
+  targetGrid.classList.toggle("hide-family-names", !showFamilyNamesInput.checked);
+  targetGrid.classList.toggle("use-family-line-borders", showFamilyBordersInput.checked);
+  if (hasWeeks || hasFamilyNameColumn) {
+    const className = hasWeeks && hasFamilyNameColumn
+      ? "weekday calendar-leading-header spans-family"
+      : "weekday calendar-leading-header";
+    targetGrid.append(createCell(className, ""));
   }
   weekdays.forEach((day) => targetGrid.append(createCell("weekday", day)));
 
   buildCalendarDays(monthDate).forEach((week) => {
-    if (showWeekNumbersInput.checked) {
-      targetGrid.append(createCell("week-number", getIsoWeek(week[0])));
+    if (hasWeeks) {
+      targetGrid.append(renderWeekNumber(week[0]));
+    }
+    if (hasFamilyNameColumn) {
+      targetGrid.append(renderFamilyLabelCell());
     }
 
     week.forEach((date) => {
       targetGrid.append(renderDay(date, monthDate));
     });
   });
+}
+
+function renderWeekNumber(date) {
+  const cell = createCell("week-number", "");
+  const week = document.createElement("span");
+  week.className = "week-number-value";
+  week.textContent = getIsoWeek(date);
+  cell.append(week);
+
+  return cell;
+}
+
+function renderFamilyLabelCell() {
+  const cell = createCell("family-label-cell", "");
+  cell.style.setProperty("--member-section-count", getFamilySections().length);
+  cell.append(renderFamilyLabelSections());
+  return cell;
+}
+
+function renderFamilyLabelSections() {
+  const sections = document.createElement("div");
+  sections.className = "family-label-sections";
+
+  getFamilySections().forEach((familySection) => {
+    const section = document.createElement("div");
+    section.className = "family-label-section";
+    section.style.setProperty("--member-color", familySection.color);
+
+    const label = document.createElement("span");
+    label.textContent = familySection.label;
+    section.append(label);
+    sections.append(section);
+  });
+
+  return sections;
 }
 
 function renderYearOverview(year) {
@@ -1417,6 +1613,9 @@ function renderYearOverview(year) {
     showWeekNumbersInput.checked,
     hideOutsideDaysInput.checked,
     showMemberColorsInput.checked,
+    showFamilyNamesInput.checked,
+    showFamilyNameColumnInput.checked,
+    showFamilyBordersInput.checked,
     getEventsSignature(),
     getMembersSignature(),
   ].join("|");
@@ -1507,6 +1706,8 @@ function renderYearPreviewPage(monthDate) {
   const grid = document.createElement("div");
   grid.className = "calendar-grid";
   grid.classList.toggle("no-weeks", !showWeekNumbersInput.checked);
+  grid.classList.toggle("has-family-sections", usesFamilyDaySections());
+  grid.classList.toggle("has-family-name-column", usesFamilyNameColumn());
   renderCalendarGrid(monthDate, grid);
   wrap.append(grid);
 
@@ -1517,11 +1718,21 @@ function renderYearPreviewPage(monthDate) {
 function renderDay(date, monthDate) {
   const cell = createCell("day", "");
   const outsideMonth = date.getMonth() !== monthDate.getMonth();
+  const hiddenOutside = outsideMonth && hideOutsideDaysInput.checked;
   if (outsideMonth) {
     cell.classList.add("outside");
   }
-  if (outsideMonth && hideOutsideDaysInput.checked) {
+  if (hiddenOutside) {
     cell.classList.add("is-hidden");
+  }
+
+  const events = state.events.filter((item) => eventOccursOn(item, date));
+  cell.classList.toggle("has-multiple-events", events.length > 1);
+  const hasFamilySections = usesFamilyDaySections() && !hiddenOutside;
+  if (hasFamilySections) {
+    cell.classList.add("has-member-sections");
+    cell.style.setProperty("--member-section-count", getFamilySections().length);
+    cell.append(renderFamilyDaySections(events, date));
   }
 
   const heading = document.createElement("div");
@@ -1529,15 +1740,40 @@ function renderDay(date, monthDate) {
   heading.textContent = date.getDate();
   cell.append(heading);
 
-  const events = state.events.filter((item) => eventOccursOn(item, date));
-  if (events.length) {
+  const sharedEvents = hasFamilySections
+    ? events.filter((event) => !getMember(event.memberId) && !getGeneralMember())
+    : events;
+  if (sharedEvents.length) {
     const list = document.createElement("div");
     list.className = "events";
-    events.forEach((event) => list.append(renderCalendarEvent(event, date.getFullYear())));
+    sharedEvents.forEach((event) => list.append(renderCalendarEvent(event, date.getFullYear())));
     cell.append(list);
   }
 
   return cell;
+}
+
+function renderFamilyDaySections(events, date) {
+  const sections = document.createElement("div");
+  sections.className = "day-member-sections";
+
+  getFamilySections().forEach((familySection) => {
+    const section = document.createElement("div");
+    section.className = "day-member-section";
+    section.style.setProperty("--member-color", familySection.color);
+
+    const sectionEvents = events.filter((event) => eventBelongsToFamilySection(event, familySection));
+    if (sectionEvents.length) {
+      const list = document.createElement("div");
+      list.className = "events";
+      sectionEvents.forEach((event) => list.append(renderCalendarEvent(event, date.getFullYear())));
+      section.append(list);
+    }
+
+    sections.append(section);
+  });
+
+  return sections;
 }
 
 function renderCalendarEvent(event, displayYear) {
@@ -1562,6 +1798,32 @@ function renderCalendarEvent(event, displayYear) {
   item.append(text);
 
   return item;
+}
+
+function usesFamilyDaySections() {
+  return showMemberColorsInput.checked && state.members.length > 0;
+}
+
+function usesFamilyNameColumn() {
+  return usesFamilyDaySections() && showFamilyNameColumnInput.checked;
+}
+
+function getFamilySections() {
+  return state.members.map((member) => ({
+    id: member.id,
+    label: member.name,
+    color: member.color,
+  }));
+}
+
+function eventBelongsToFamilySection(event, section) {
+  if (event.memberId === section.id) return true;
+  const generalMember = getGeneralMember();
+  return !getMember(event.memberId) && generalMember?.id === section.id;
+}
+
+function getGeneralMember() {
+  return state.members.find((member) => member.id === DEFAULT_GENERAL_MEMBER.id);
 }
 
 function eventOccursOn(event, date) {
@@ -1593,7 +1855,7 @@ function renderEventList() {
     .forEach((event) => {
       const item = document.createElement("li");
       const text = document.createElement("span");
-      const member = getMember(event.memberId);
+      const member = getMember(event.memberId) || (!getMember(event.memberId) && getGeneralMember());
       const memberLabel = member ? ` [${member.name}]` : "";
       text.textContent = `${event.date}${memberLabel} ${event.text}`;
 
@@ -1623,23 +1885,43 @@ function renderMembers() {
     option.textContent = member.name;
     eventMemberInput.append(option);
   });
+  const generalMember = getGeneralMember();
   eventMemberInput.value = state.members.some((member) => member.id === selectedMember)
     ? selectedMember
-    : "";
+    : generalMember?.id || "";
 
   memberList.innerHTML = "";
-  state.members.forEach((member) => {
+  state.members.forEach((member, index) => {
     const item = document.createElement("li");
-    const pill = document.createElement("span");
-    pill.className = "member-pill";
+    item.className = "member-editor";
 
-    const swatch = document.createElement("span");
-    swatch.className = "member-swatch";
-    swatch.style.setProperty("--member-color", member.color);
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.value = member.name;
+    nameInput.setAttribute("aria-label", "Family member name");
+    nameInput.addEventListener("change", () => {
+      updateMember(member.id, { name: nameInput.value.trim() || member.name });
+    });
 
-    const name = document.createElement("span");
-    name.textContent = member.name;
-    pill.append(swatch, name);
+    const colorInput = document.createElement("input");
+    colorInput.type = "color";
+    colorInput.value = member.color;
+    colorInput.setAttribute("aria-label", `${member.name} color`);
+    colorInput.addEventListener("change", () => {
+      updateMember(member.id, { color: colorInput.value });
+    });
+
+    const moveUpButton = document.createElement("button");
+    moveUpButton.type = "button";
+    moveUpButton.textContent = "Up";
+    moveUpButton.disabled = index === 0;
+    moveUpButton.addEventListener("click", () => moveMember(member.id, -1));
+
+    const moveDownButton = document.createElement("button");
+    moveDownButton.type = "button";
+    moveDownButton.textContent = "Down";
+    moveDownButton.disabled = index === state.members.length - 1;
+    moveDownButton.addEventListener("click", () => moveMember(member.id, 1));
 
     const button = document.createElement("button");
     button.type = "button";
@@ -1652,9 +1934,27 @@ function renderMembers() {
       renderAndSave();
     });
 
-    item.append(pill, button);
+    item.append(nameInput, colorInput, moveUpButton, moveDownButton, button);
     memberList.append(item);
   });
+}
+
+function updateMember(memberId, updates) {
+  state.members = state.members.map((member) =>
+    member.id === memberId ? { ...member, ...updates } : member,
+  );
+  renderAndSave();
+}
+
+function moveMember(memberId, direction) {
+  const index = state.members.findIndex((member) => member.id === memberId);
+  const nextIndex = index + direction;
+  if (index < 0 || nextIndex < 0 || nextIndex >= state.members.length) return;
+
+  const members = [...state.members];
+  [members[index], members[nextIndex]] = [members[nextIndex], members[index]];
+  state.members = members;
+  renderAndSave();
 }
 
 function getMember(memberId) {
@@ -1754,6 +2054,9 @@ function saveState() {
       showWeekNumbers: showWeekNumbersInput.checked,
       hideOutsideDays: hideOutsideDaysInput.checked,
       showMemberColors: showMemberColorsInput.checked,
+      showFamilyNames: showFamilyNamesInput.checked,
+      showFamilyNameColumn: showFamilyNameColumnInput.checked,
+      showFamilyBorders: showFamilyBordersInput.checked,
       showPhotoAccent: showPhotoAccentInput.checked,
       importRegex: importRegexInput.value,
       viewMode: state.viewMode,
@@ -1816,6 +2119,11 @@ function loadSavedState() {
       hideOutsideDaysInput.checked = saved.settings.hideOutsideDays ?? hideOutsideDaysInput.checked;
       showMemberColorsInput.checked =
         saved.settings.showMemberColors ?? showMemberColorsInput.checked;
+      showFamilyNamesInput.checked = saved.settings.showFamilyNames ?? showFamilyNamesInput.checked;
+      showFamilyNameColumnInput.checked =
+        saved.settings.showFamilyNameColumn ?? showFamilyNameColumnInput.checked;
+      showFamilyBordersInput.checked =
+        saved.settings.showFamilyBorders ?? showFamilyBordersInput.checked;
       showPhotoAccentInput.checked = saved.settings.showPhotoAccent ?? showPhotoAccentInput.checked;
       importRegexInput.value = saved.settings.importRegex || importRegexInput.value;
       state.viewMode = saved.settings.viewMode || state.viewMode;
@@ -1947,6 +2255,13 @@ class PdfPage {
     );
   }
 
+  textRotated(text, x, y, size, font) {
+    const fontName = font === "Helvetica-Bold" ? "Helvetica-Bold" : "Helvetica";
+    this.commands.push(
+      `BT /${fontName} ${fmt(size)} Tf 0 1 -1 0 ${fmt(x)} ${fmt(this.height - y)} Tm (${escapePdfText(text)}) Tj ET`,
+    );
+  }
+
   imageCover(image, x, y, width, height) {
     const pdfImage = this.document.addImage(image);
     this.images.add(pdfImage);
@@ -1972,6 +2287,23 @@ function mmToPt(mm) {
 
 function fmt(value) {
   return Number(value).toFixed(2).replace(/\.?0+$/, "");
+}
+
+function mixHexColors(color, background, ratio) {
+  const foregroundRgb = parseHexColor(color);
+  const backgroundRgb = parseHexColor(background);
+  if (!foregroundRgb || !backgroundRgb) return color;
+
+  const mixed = foregroundRgb.map((value, index) =>
+    Math.round(value * ratio + backgroundRgb[index] * (1 - ratio)),
+  );
+  return `#${mixed.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function parseHexColor(color) {
+  const normalized = String(color).trim().replace(/^#/, "");
+  if (!/^[0-9a-f]{6}$/i.test(normalized)) return null;
+  return [0, 2, 4].map((index) => parseInt(normalized.slice(index, index + 2), 16));
 }
 
 function rgb(color) {

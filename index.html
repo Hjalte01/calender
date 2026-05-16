@@ -55,6 +55,7 @@
           </label>
           <button id="downloadPdfButton" type="button">Download PDF</button>
           <button id="printButton" type="button">Print</button>
+          <button id="resetStorageButton" type="button">Reset saved browser data</button>
         </div>
 
         <div class="control-group is-hidden" data-panel="style">
@@ -103,6 +104,10 @@
             Show family colors
           </label>
           <label class="checkbox-row">
+            <input id="showFamilyNamesInput" type="checkbox" checked />
+            Show family names
+          </label>
+          <label class="checkbox-row">
             <input id="showPhotoAccentInput" type="checkbox" checked />
             Show photo accent line
           </label>
@@ -122,6 +127,14 @@
             </label>
           </div>
           <button id="addMemberButton" type="button">Add family member</button>
+          <label class="checkbox-row">
+            <input id="showFamilyNameColumnInput" type="checkbox" checked />
+            Show family name list beside weeks
+          </label>
+          <label class="checkbox-row">
+            <input id="showFamilyBordersInput" type="checkbox" />
+            Use calendar line borders between names
+          </label>
           <ul id="memberList" class="member-list"></ul>
         </div>
 
